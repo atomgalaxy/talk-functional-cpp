@@ -178,6 +178,21 @@ The final guideline:
 
 Name common patterns and control flow.
 
+## Disclaimer
+
+C++ is not made for this. Yet.
+
+The errors are bad.
+
+The compile times are worse.
+
+The runtime performance is actually pretty great.
+
+When in doubt, do the simple thing.
+
+The examples are kinda contrived, but I swear it pays off in the large.
+
+And yes, I have proposals in flight that will make this better. A bit.
 
 ## Compositional contexts and where to find them
 
@@ -186,12 +201,170 @@ Name common patterns and control flow.
 Procedural way:
 
 ```cpp
-auto get_target_hostname(int argc, char const* const* argv)
-        -> std::optional<std::string> {
+auto is_hostname_in_args(int, char const* const*) -> bool;
+auto get_hostname_from_args(int, char const* const*) -> char const*;
+auto get_target_hostname(
+            int argc, char const* const* argv,
+            std::string default_hostname)
+        -> std::string {
+    // split query / getter
     if (is_hostname_in_args(argc, argv)) {
         // perhaps... might use optional here too?
         return get_hostname_from_args(argc, argv);
     } 
-    if (getenv(""))
+    // ad-hoc Maybe
+    if (char const* maybe_host = getenv("SERVICE_HOSTNAME");
+        (maybe_host != nullptr) || (*maybe_host == '\0')) {
+        return maybe_host;
+    }
+    return default_hostname;
 }
 ```
+
+It's much better if things speak the same language. For "try multiple things",
+the context is usually "Maybe", modeled by `optional` in c++:
+
+First, we prepare a few general-purpose functions that all speak `optional`:
+
+This one should always have had a decent interface:
+
+```cpp
+// from pair of query & getter to just a getter
+auto is_hostname_in_args(int, char const* const*) -> bool;
+auto get_hostname_from_args(int, char const* const*) -> char const*;
+// to:
+inline constexpr auto maybe_hostname_from_args = 
+    [](int argc, char const* const* argv) 
+        -> std::optional<std::string> {/*...*/}
+```
+
+We can transform the ad-hod "maybe" with nullptr return of `std::getenv` into
+an optional:
+
+```cpp
+inline constexpr auto get_env = [](std::string const& varname)
+        -> std::optional<std::string> {
+    if (char const* value = std::getenv(varname.c_str());
+            value != nullptr) {
+        return std::optional(std::string(value));
+    }
+    return {std::nullopt};
+};
+```
+
+For the nonempty bit, we'll need a `filter`:
+
+```cpp
+inline constexpr auto filter = [](auto predicate) {
+    return [p = std::move(predicate)]<class T>(T&& value)  {
+        using r_t = std::optional<std::decay_t<T>>;
+        if (std::invoke(p, value)) {
+            return r_t(std::forward<T>(value));
+        }
+        return r_t(std::nullopt);
+    };
+};
+```
+
+And we can finally put it together:
+
+```cpp
+inline constexpr auto nonempty = [](auto const& s){return !s.empty();};
+auto get_target_hostname(
+            int argc, char const* const* argv,
+            std::string const& default_hostname)
+        -> std::string {
+    return maybe_hostname_from_args(argc, argv)
+          .or_else([]{
+            return get_env("SERVICE_HOSTNAME")
+                   .and_then(filter(nonempty));
+           })
+          // can add other ways
+          .value_or(auto(default_hostname));
+}
+```
+
+It's a bit of a mouthful, mostly because of the annoying way we defined filter.
+Let's try again:
+
+```cpp
+inline constexpr struct filter_t {
+    template <typename P>
+    struct closure { P pred; };
+
+    template <an_optional Opt, typename P>
+    friend constexpr auto operator|(Opt&& opt, closure<P> const& cl) 
+            -> std::decay_t<Opt> {
+        using opt_t = std::decay_t<Opt>;
+        return std::forward<Opt>(opt).and_then([&]<class T>(T&& v) -> opt_t {
+            if (std::invoke(cl.pred, v)) {
+                return opt_t(std::forward<T>(v));
+            }
+            return std::nullopt;
+        });
+    }
+
+    constexpr auto operator()(auto&& predicate) const {
+        return closure{std::forward<decltype(predicate)>(predicate)};
+    }
+} filter;
+```
+
+Ah, yes, the wonderful paths we must walk to enable `|`-based composition.
+
+However, this enables us to omit the `and_then`:
+
+```cpp
+auto get_target_hostname(
+            int argc, char const* const* argv,
+            std::string const& default_hostname)
+        -> std::string {
+    return maybe_hostname_from_args(argc, argv)
+          .or_else([]{ return get_env("SERVICE_HOSTNAME") | filter(nonempty); })
+          .value_or(auto(default_hostname));
+}
+```
+
+We need a concept for the above:
+
+```cpp
+// fastest-to-compile is_instantiation_of I know of, as of right now
+template <typename X>
+inline constexpr bool _an_optional_v = false;
+template <typename T>
+inline constexpr bool _an_optional_v<std::optional<T>&> = true;
+template <typename T>
+inline constexpr bool _an_optional_v<std::optional<T> const&> = true;
+
+template <typename X>
+concept an_optional = _an_optional_v<X&>;
+```
+
+You can assume everything called `an_XXX` or `a_YYY` is a concept.
+
+Last thing: fix the defaulting. If you don't need to make a choice, why make it?
+
+It's actually more efficient to just let the caller do it:
+
+```cpp
+auto maybe_target_hostname_from_params(int argc, char const* const* argv)
+        -> std::string {
+    return maybe_hostname_from_args(argc, argv)
+          .or_else([]{ return get_env("SERVICE_HOSTNAME") | filter(nonempty); });
+}
+
+int main(int argc, char** argv) {
+    auto const config_file =
+        maybe_config_file_from_params(argc, argv)
+       .value_or({});
+    auto const target_hostname =
+        maybe_target_hostname_from_params(argc, argv)
+       .or_else([&]{return config_file.maybe_get_hostname();})
+       .value_or("default_hostname");
+}
+```
+
+
+
+
+
