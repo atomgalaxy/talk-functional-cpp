@@ -178,21 +178,28 @@ The final guideline:
 
 Name common patterns and control flow.
 
-## Disclaimer
+## Disclaimers
 
-C++ is not made for this. Yet.
+**This is slide code.**
+
+I omitted at least constexpr propagation, SFINAE, nicer errors,
+compiletime-speed enhancements, lots of niceness, automatic inference, and tons
+of other stuff.
+
+C++ is not made for this. Yet. I have proposals in flight that will make this
+better. A bit.
 
 The errors are bad.
 
 The compile times are worse.
 
-The runtime performance is actually pretty great.
+The runtime performance is actually pretty great (something something aliasing
+inlining constprop).
 
 When in doubt, do the simple thing.
 
 The examples are kinda contrived, but I swear it pays off in the large.
 
-And yes, I have proposals in flight that will make this better. A bit.
 
 ## Compositional contexts and where to find them
 
@@ -352,7 +359,12 @@ auto maybe_target_hostname_from_params(int argc, char const* const* argv)
     return maybe_hostname_from_args(argc, argv)
           .or_else([]{ return get_env("SERVICE_HOSTNAME") | filter(nonempty); });
 }
+```
 
+
+Usage:
+
+```
 int main(int argc, char** argv) {
     auto const config_file =
         maybe_config_file_from_params(argc, argv)
@@ -364,7 +376,203 @@ int main(int argc, char** argv) {
 }
 ```
 
+This isn't always true - you might choose to do it in one or the other location
+depending on the desired semantics.
 
+## Packs
 
+There's another thing that is very nice to do when you want to compose these --
+packing.
+
+```cpp
+auto connect(config c) -> std::optional<socket_addr> {
+    return (c.get_maybe("hostname") & c.get_maybe("port")) // an optional-pack
+        .transform([](std::string && hostname, int port){
+             return socket_addr{std::move(hostname), port};
+        });
+}
+```
+
+This is a pretty common pattern, so it's helpful to have a constructor-lift:
+
+```cpp
+template <typename T>
+inline constexpr make = []<typename... Ts>(Ts&&... args) {
+    return T(std::forward<Ts>(args)...);
+};
+auto connect(config c) -> std::optional<socket_addr> {
+    return (c.get_maybe("hostname") & c.get_maybe("port")) // an optional-pack
+        .transform(make<socket_addr>);
+}
+```
+
+For completeness: the table of monadic operations on `optional`:
+
+```
+and_then  :: optional<T>, (f(T) -> optional<U>) -> optional<U>;
+transform :: optional<T>, (f(T) -> U)           -> optional<U>;
+or_else   :: optional<T>, (F()  -> T)           -> optional<T>;
+value_or  :: optional<T>, T                     -> T;
+```
+
+## Error compositional pattern - `std::expected<T, E>`
+
+The way C++ chose to model this is a tad different from the usual way of doing
+`Error<E, T>`, where the constructors are `left` for errors and `right` for
+success.
+
+The `Error` monad looks superficially related to `Maybe`, but the two have a
+very different flavor.
+
+First, there is only one `Maybe` - but there are as many `Error`s as there are
+error types.
+
+Observe and contrast the operation table of monadic operations of `expected<T, E>`:
+
+```
+and_then  :: expected<T, E>, (f(T) -> expected<U, E>) -> expected<U, E>;
+transform :: expected<T, E>, (f(T) -> U)              -> expected<U, E>;
+or_else   :: expected<T, E>, (F()  -> T)              -> expected<T, E>;
+transform_error :: expected<T, E>, (f(E) -> E')       -> expected<T, E'>;
+value_or  :: expected<T, E>, T                        -> T;
+```
+
+On the face of it, we just gained `transform_error`, and the rest look like
+`optional`. However, notice that `and_then` cannot change `E`, and neither can
+`or_else`. This means we actually got an `optional`-per-`E`.
+
+This makes `expected` effectively a domain-based composition type, not a
+general-purpose one.
+
+For instance, you might want to use it for a compositional parser
+infrastructure, where every parser has the signature of
+
+```cpp
+auto subgrammar(std::span<char const>)
+     -> std::expected<
+           pair<SomeGrammarNode, std::span<char const>>,
+           ParseError
+        >;
+```
+
+Nevertheless, this is one of the most useful compositional tools when combined
+with a variant implementation that's a bit more fully-featured than the
+standard one.
+
+For instance, when dealing with validating json responses one gets back from
+web services, it's really nice to be able to do the following:
+
+```cpp
+// transform_nothing:: optional<T>, (f() -> E) -> expected<T, E>
+auto parse_response(json const& doc)
+    -> std::expected<Response, ParseError>
+{
+    return (
+        (doc.get_maybe("version") 
+            | transform_nothing(
+                []{return ParseError("version is required");})
+            | parse_version 
+            | filter(eq(version{3, 14}), make<ParseError>)
+        ) // expected<Version, ParseError>
+        & (doc.get_maybe("id")
+            | transform_nothing(
+                []{return ParseError("id is required");})
+            | parse_int
+            | transform(make<Id>)
+        )
+        & /*...*/
+        ) // expected-pack<Version, Id, ..., ParseError>
+        .transform(make<Response>);
+}
+```
+
+The nice thing here is that it's really easy to see we didn't forget any error
+checking. There's no way to make the intermediate results without going through
+a parser, validator, and constructor, and there is no way to make a `Response`
+without having everything go correctly.
+
+We used another really important tool here - strong types. Yes, Version is just
+an integer, but we can't make a `Response` without a `Version`, not just any
+`int`. This catches a lot of bugs.
+
+The general guideline we had was that only plausible business logic should
+compile. That meant, for instance, that `price + price` didn't make any sense -
+`price + price_delta` did. Technically, prices of instruments are a point space
+over a vector space of `price_delta`. We modeled that. This is also modeled in
+`std::chrono`.
+
+## Dealing with multiple error types and drilling
+
+In order to deal with multiple error types, we're going to need a better
+variant with some fun autodetecting `transform` operations.
+
+Let's pretend `variant` is a compositional context. What is its table of basis
+operations?
+
+```
+visit  :: variant<T, U, ...>, (f(T|U|...) -> V) -> V;
+???
+```
+
+We probably want some equivalent of `transform`, at least.
+
+```
+visit     :: variant<T, U, ...>, (f(T|U|...) -> V) -> V;
+transform :: 
+    variant<T, U, ...>, overload{f(T) -> T', f(U) -> U', ...}
+    -> variant<T', U', ...>;
+```
+
+The usual name for `visit` is `match`, and the name for `transform` is `map` or
+`fmap`.
+
+There's another operation that is really useful to have - some kind of `bind`
+where overloads can return partial variants:
+
+```
+pmap :: v<T, U, ...>, overload{f(T)->v<T',T''>, f(U)->v<U', U''>, ...}
+    -> v<T, T'', U', U'', ...>;
+```
+
+As an example, let's take a look at a state machine:
+
+```cpp
+using State = variant<Initialized, Connecting, Connected, Disconnected, Fail>;
+using Message = variant<Connect, Stop, Data, UnexpectedDisconnect>;
+template <typename X>
+concept a_live_state = std::same_as<X, Initialized> 
+                    || std::same_as<X, Connecting>
+                    || std::same_as<X, Connected>;
+```
+
+We will also introduce multiple dispatch using `pmap` over a `variant-pack`:
+
+```cpp
+auto transition(State s, Message m) {
+    return (s & m) | pmap(overload{ // double dispatch!
+        [](Initialized s, Connect c)
+            -> variant<Connecting, Fail> {...},
+        [](Connected auto s, Data d)
+            -> variant<Connected, Fail> {...},
+        [](a_live_state auto s, Stop)
+            -> variant<Disconnected> {...},
+        [](a_live_state auto s, UnexpectedDisconnect)
+            -> variant<Connecting, Fail> {...},
+        [](auto s, auto m)
+            -> variant<Fail> { return variant<Fail>{}; },
+    });
+}
+```
+
+`pmap` is doing a lot of heavy lifting here. It's getting the `invoke_result`
+of every invocation possibility, concatenating all the possibilities in the
+variants, and deduplicating them to arrive at the resulting type.
+
+Once that's done, it's turning the construction of the resulting variant into
+the construction of the full one, behind the scenes.
+
+To make things a bit more efficient, we can introduce a
+`partial<Type>(in-place-args)` that we can return instead, or interpret
+`variant<lazily<T>, lazily<U>>` as in-place constructors for `T` and `U`.
 
 
