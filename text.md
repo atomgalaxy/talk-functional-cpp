@@ -1,5 +1,16 @@
 # (Fun)-ctional c++ and the M-word
 
+Gašper Ažman
+
+2023-12-05
+
+C++ London Meetup
+
+==SLIDE==
+
+<!-- .slide data-background-image="image/magma-glowhouse.png"-->
+
+==SLIDE==
 
 It's dangerous to go alone! Take this!
 
