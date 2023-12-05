@@ -46,67 +46,20 @@ Applicative, Monad, and pattern matching.
 
 I'm omitting all of the metaprogramming.
 
-# History
 
-Also, in the beginning, there was chaos. [picture of cable mess]
+## The main point
 
-From this chaos, core memory was born, and with it, the Von Neumann architecture.
+Functional programming is about tight control of relevant context, which aids
+local reasoning, which is critical for provability.
 
-And for a while, it was good. The while was about 3 months. [todo check number]
-
-Then assembly came, because rememmbering ones and zeroes is difficult. Programs
-writing programs.
-
-And then came Dijkstra and structured programming, and gave us procedures (and
-with them, ABI (thanks Dijkstra)). It also gave us loops and if/then/else, and
-blocks.
-
-The chaos was being ordered, slowly, but all was not yet well. Notice that all
-of these constructs were about taking things away. From infinite possibilities
-and few instructions, we introduce more constructs that are more limited, and
-we gain order and expressivity.
-
-This gets rid of the fear of "anything can happen". It increases locality of
-reasoning, because the programmer can trust the rest of the program doesn't do
-anything weird.
-
-The next step was layered architecture, where we forbid lower layers from
-knowing things about higher ones, and also try to avoid reaching-through. This
-gets rid of interference between layers, further increasing locality of
-reasoning.
-
-The next step was object-oriented programming (before object-oriented
-languges), where we hide representation and make it "forbidden" to access state
-in certain ways. It also introduces the value of a principled approach to open
-polymorphism (think unix inodes). This step was supposed to increase locality
-of reasoning about state, but ended up also being counterproductive by breaking
-layering in many places.
-
-So, state was better protected, and invariants on such state were easier to
-keep, and that's pretty much where we stayed.
-
-Objects needed constructors, and exception handling added another control flow
-path to our code. Still structured, but now we had hidden control flow, and
-this further *decreased* locality of reasoning. The compiler could help even
-less than it could before.
-
-Along came generic programming. This duck-typed approach allowed us to
-decompose solutions into self-contained pieces in a variety of ways, trying to
-reclaim some of the locality of reasoning that was lost. But the true
-breakthrough in generic programming came when it stopped being ad-hoc, and
-started using concepts.
-
-Concepts, when used with discipline, allow us to restrict our thinking to what
-the concept promises, and thus decouple proofs of code from the actual bits and
-pieces implementing the suboperations, be it state or functions. It reduces the
-amount of context to the precise bits that the concepts promise.
-
-Let's analize the actual context of every c++ function:
+Let's take a look at the context that's possibly relevant to a procedural line
+of code in a C++ program (most lines of code call at least one function).
 
 Explicit context:
-	- arguments
+	- function arguments
 	- *this
         - your object has state!
+    - local variables
 
 Block context:
     - loop condition
@@ -139,12 +92,9 @@ Implicit context:
       node, IO thread, compute thread, which threadpool?)
     - how do I cancel the current operation? Is it even cancellable?
 
-Sure, most of the time we can "infer" which of this context matters to our
-function or block, so we don't consider all of it all the time; but have you
-read all the code you're calling? How can you ensure the closure of its
-implicit preconditions?
-
-Yes, procedural code is hell.
+When we write code, we absolutely rely on most of this context being irrelevant
+at any one time. However, *which* bits are irrelevant is up to convention and
+discipline. This is precisely the problem with procedural languages.
 
 Let's see how we can cut down on the amount of context we need to consider.
 
