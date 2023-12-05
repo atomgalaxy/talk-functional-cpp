@@ -1,16 +1,52 @@
+# (Fun)-ctional c++ and the M-word
+
+
 It's dangerous to go alone! Take this!
 
 We want to let the compiler prove our code.
 
-But we need to prove our code too! You do it intuitively, otherwise your code
-wouldn't work. Then we make little programs that check the proofs in our head
-make sense. We call these tests. But tests only check for obvious errors in our
-thinking, but they don't check for all of them. We should use the tools at our
-disposal.
+But we need to prove our code too! We do it intuitively, otherwise our code
+wouldn't work.
+
+We make little programs that check the proofs in our head make sense. We call
+these tests. But tests only check for obvious errors in our thinking, but they
+don't check for all of them. We should use the tools at our disposal.
 
 The most important tool we have is our brain, and it doesn't fit a whole lot.
 That's why we need ways of breaking down *solutions*, not just the problems
 we're working on. The less input to your proof, the easier it is.
+
+
+## Disclaimers
+
+**This is slide code.**
+
+I omitted at least constexpr propagation, SFINAE, nicer errors,
+compiletime-speed enhancements, lots of niceness, automatic inference, and tons
+of other stuff.
+
+C++ is not made for this. Yet. I have proposals in flight that will make this
+better. A bit.
+
+The errors are bad.
+
+The compile times are worse.
+
+The runtime performance is actually pretty great (something something aliasing
+inlining constprop).
+
+When in doubt, do the simple thing.
+
+The examples are kinda contrived, but I swear it pays off in the large.
+
+I'll also be using the word "monad" very loosely - definitely not the way
+mathematics defines it. "Monad" really just means "compositional context" for
+the purposes of this talk. It's technically some kind of mix of Functor,
+Applicative, Monad, and pattern matching.
+
+I'm omitting all of the metaprogramming.
+
+# History
 
 Also, in the beginning, there was chaos. [picture of cable mess]
 
@@ -139,7 +175,7 @@ catch (same_as<E1, E2, E3> auto&& exc) { /* no you don't says C++ */ }
 ```
 
 ```cpp
-g() | upon_error([](std::same_as<E1, E2, E3> auto&& exc) {
+g() | transform_error([](std::same_as<E1, E2, E3> auto&& exc) {
     // ahhh, yiss
 });
 ```
@@ -177,29 +213,6 @@ and I welcome renaming suggestions.
 The final guideline:
 
 Name common patterns and control flow.
-
-## Disclaimers
-
-**This is slide code.**
-
-I omitted at least constexpr propagation, SFINAE, nicer errors,
-compiletime-speed enhancements, lots of niceness, automatic inference, and tons
-of other stuff.
-
-C++ is not made for this. Yet. I have proposals in flight that will make this
-better. A bit.
-
-The errors are bad.
-
-The compile times are worse.
-
-The runtime performance is actually pretty great (something something aliasing
-inlining constprop).
-
-When in doubt, do the simple thing.
-
-The examples are kinda contrived, but I swear it pays off in the large.
-
 
 ## Compositional contexts and where to find them
 
@@ -501,7 +514,7 @@ compile. That meant, for instance, that `price + price` didn't make any sense -
 over a vector space of `price_delta`. We modeled that. This is also modeled in
 `std::chrono`.
 
-## Dealing with multiple error types and drilling
+## Dealing with multiple error types (take 1)
 
 In order to deal with multiple error types, we're going to need a better
 variant with some fun autodetecting `transform` operations.
@@ -533,6 +546,7 @@ where overloads can return partial variants:
 pmap :: v<T, U, ...>, overload{f(T)->v<T',T''>, f(U)->v<U', U''>, ...}
     -> v<T, T'', U', U'', ...>;
 ```
+
 
 As an example, let's take a look at a state machine:
 
@@ -575,4 +589,117 @@ To make things a bit more efficient, we can introduce a
 `partial<Type>(in-place-args)` that we can return instead, or interpret
 `variant<lazily<T>, lazily<U>>` as in-place constructors for `T` and `U`.
 
+### Back to our `expected<T, variant<Es...>>`
+
+Let's try to use our error monad with this improved `variant` on the `Error`
+side:
+
+```cpp
+open(path) // expected<File, variant<DoesNotExist, PermissionsError>>
+    | and_then(
+        read_line // expected<std::string, IOError>
+        | transform_error(???) // oops
+    )
+```
+
+Can't. Need to try this again:
+
+```cpp
+using AllErrors = variant<DoesNotExist, PermissionsError, IOError>;
+open(path) // expected<File, variant<DoesNotExist, PermissionsError>>
+    | transform_error(match(make<AllErrors>))
+    // blech
+    | and_then(
+        read_line // expected<std::string, IOError>
+        | transform_error(make<AllErrors>) // ok, now
+    )
+    | and_then(
+        parse_version // expected<Version, SyntaxError> oh, nononono.
+    )
+```
+
+We need something less annoying that accumulates error types.
+
+## Monadic mixins -- validations
+
+Returning back to our `expected` with multiple error types - we need to make
+`expected` work with that. We call that the `validation` context.
+
+Validations basically "mix in" the `variant` on the `error` side, instead of
+merely composing them. This allows us to compute types more effectively, since
+we're relaxing the restriction on a single error type.
+
+Let's try the example again:
+
+```cpp
+auto version_or_error = open(path) // validation<File, DoesNotExist, PermissionsError>
+    | and_then(read_line           // expected<std::string, IOError>
+    ) // validation<std::string, DoesNotExist, PermissionsError, IOError>
+    | and_then(parse_version);
+    // validation<Version, DoesNotExist, PermissionsError, IOError, SyntaxError>
+```
+
+`validation` is a closed-polymorphic equivalent to c++ exceptions.
+
+And, true-to-form, we can also handle the errors generically, unlike `catch`
+clauses:
+
+```cpp
+template <typename X, typename... Ts>
+concept any_of = (... || std::same_as<std::remove_cvref_t<X>, Ts>);
+
+version_or_error
+    | match_error( // match may return void
+        overload{
+        [](any_of<DoesNotExist, PermissionsError, IOError> auto&& e) {
+            std::print("could not read file {}", e.filename);
+        },
+        [](SyntaxError const& e) {
+            std::print("syntax error near column {}", e.col);
+        }
+    });
+```
+
+`transform_error` of course exists, but the `match` family doesn't require me
+to invent something to return.
+
+Recap: we mixed in the `variant` context into the `expected` context. Are there
+other mixed-in contexts?
+
+
+## The biggest context: the async context
+
+I am, of course, talking about `p2300`, `std::execution`, or, as you might know
+it, Sender/Receiver.
+
+It's mixing in:
+
+- variant (for the completion channels)
+- Environment (a type-tagged state composition context) for scheduler,
+  cancellation token, and domain
+- it's biased like `expected` and `optional` (the `set_value` channel family is primary)
+- and the crown jewel, of course, the async I/O context, which governs execution.
+- oh, and don't forget timing.
+
+We really don't have time to get into that in this talk, but at least I gave
+you some idea on how to understand it if you start studying it.
+
+I've seen this context drive connections between redis caches, postgresql
+servers, and multiple UDP and TCP connections. It's fantastic, and made writing
+correct async code a breeze.
+
+However, we only used it for the bits that concerned execution and async
+behavior. For the rest, we used the above contexts, and strong types.
+
+## Conclusion
+
+In order to name common control flow patterns, we reach for named compositional
+contexts, some of which are monads.
+
+We explored the following contexts today:
+
+- `optional` or "Maybe"
+- `expected` or "Error"
+- `variant` or "Choice"
+- `validation`
 
