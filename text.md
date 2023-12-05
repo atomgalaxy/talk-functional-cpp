@@ -1,4 +1,4 @@
-# (Fun)-ctional c++ and the M-word
+# (Fun)ctional c++
 
 Gašper Ažman
 
@@ -8,14 +8,106 @@ C++ London Meetup
 
 ==SLIDE==
 
-<!-- .slide data-background-image="image/magma-glowhouse.png"-->
+<!-- .slide: data-background-image="image/wizard-glitch.png" data-background-size="contain" -->
 
 ==SLIDE==
 
-It's dangerous to go alone! Take this!
+## Disclaimers
 
-We want to let the compiler prove our code.
+==DOWN==
 
+**This is slide code.**
+
+==DOWN==
+
+## Omitted
+
+- noexcept propagation
+- SFINAE
+- nicer errors
+- all of the metaprogramming.
+
+==DOWN==
+
+## Ommitted (cont)
+
+- compile-time optimizations
+- lots of niceness
+- automatic inference
+- and tons of other stuff.
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/forest-dwelling.png" data-background-size="contain" -->
+
+==DOWN==
+
+C++ is not made for this. Yet.
+
+I have proposals in flight that will make this better.
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/viaduct-balthazar.png" data-background-size="contain" -->
+
+==DOWN==
+
+The errors are bad.
+
+==DOWN==
+
+The compile times are worse.
+
+
+==DOWN==
+
+The runtime performance is actually pretty great
+
+(something something aliasing inlining constprop).
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/viaduct.png" data-background-size="contain" -->
+
+==DOWN==
+
+When in doubt, do the simple thing.
+
+Functional approaches pay off in the large.
+
+==SLIDE==
+
+## Optimize for correctness
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/viaduct-balthazar.png" data-background-size="contain" -->
+
+==DOWN==
+
+Let the compiler prove our code.
+
+Only plausible business logic should compile.
+
+Tests are CRCs for our proofs.
+
+The typesystem _is_ a proof system.
+
+==DOWN==
+
+Our brain does not fit a lot, and proofs are hard.
+
+We break down problems - but do we break down solutions?
+
+==DOWN==
+
+Context is the greatest complectifier of proof.
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/dragon-tower.png" data-background-size="contain" -->
+
+<!--
 But we need to prove our code too! We do it intuitively, otherwise our code
 wouldn't work.
 
@@ -26,86 +118,134 @@ don't check for all of them. We should use the tools at our disposal.
 The most important tool we have is our brain, and it doesn't fit a whole lot.
 That's why we need ways of breaking down *solutions*, not just the problems
 we're working on. The less input to your proof, the easier it is.
+-->
 
+==SLIDE==
 
-## Disclaimers
+## Context of a line of code
 
-**This is slide code.**
-
-I omitted at least constexpr propagation, SFINAE, nicer errors,
-compiletime-speed enhancements, lots of niceness, automatic inference, and tons
-of other stuff.
-
-C++ is not made for this. Yet. I have proposals in flight that will make this
-better. A bit.
-
-The errors are bad.
-
-The compile times are worse.
-
-The runtime performance is actually pretty great (something something aliasing
-inlining constprop).
-
-When in doubt, do the simple thing.
-
-The examples are kinda contrived, but I swear it pays off in the large.
-
-I'll also be using the word "monad" very loosely - definitely not the way
-mathematics defines it. "Monad" really just means "compositional context" for
-the purposes of this talk. It's technically some kind of mix of Functor,
-Applicative, Monad, and pattern matching.
-
-I'm omitting all of the metaprogramming.
-
-
-## The main point
-
+<!--
 Functional programming is about tight control of relevant context, which aids
 local reasoning, which is critical for provability.
 
 Let's take a look at the context that's possibly relevant to a procedural line
 of code in a C++ program (most lines of code call at least one function).
+-->
 
-Explicit context:
-	- function arguments
-	- *this
-        - your object has state!
-    - local variables
+### Explicit context:
 
-Block context:
-    - loop condition
-    - loop postcondition (inverse of loop condition!)
-    - current enclosing if-conditions
-    - negations of previous if-conditions (we're in the else block)
-    - catch (type)
-    - are we processing a sequence? (ranged for-loops)
+- function arguments
+- *this
+    - your object has state!
+- local variables
 
-Implicit context:
-    - global variables
-    - threadlocal variables
-    - system call accessible stuff (environment variables, filesystem, gid/uid)
-    - current exception (this is an implicit argument if you're in a Lippincott function!)
-    - which exceptions *may* be thrown by subcalls
-    - cursors of open files
-    - open sockets / connections
-    - shared memory regions
-    - dispatched async operations waiting to complete
-    - operating system limits
-    - global subsystems (singletons)
-        - logging
-        - execution resources
-        - memory allocator
-        - shared network connections
-    - if your object is a state machine, which *state* you're in is implicit
-      context.
-    - What execution context is running the code? (high priority thread, main
-      thread, low priority thread, top-half of a signal handler, GPU, NUMA
-      node, IO thread, compute thread, which threadpool?)
+==DOWN==
+
+### Block context:
+
+- loop condition (if in loop)
+- loop postcondition (if after loop)
+    - [inverse of loop condition!]
+- current enclosing if-conditions
+- negations of previous if-conditions (we're in the else block)
+- catch (type)
+- are we processing a sequence? (ranged for-loops)
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/dragon-timeline.png" data-background-size="contain" -->
+
+==DOWN==
+
+### Implicit context:
+
+- global variables
+- threadlocal variables
+- syscall-accessible stuff
+    - environment variables
+    - filesystem
+    - gid/uid
+    - ...
+
+==DOWN==
+
+### Implicit context (cont):
+
+- current exception (this is an implicit argument if you're in a Lippincott function!)
+- which exceptions *may* be thrown by subcalls
+- cursors of open files
+- open sockets / connections
+- shared memory regions
+
+==DOWN==
+
+### Implicit context (cont 2):
+
+- dispatched async operations waiting to complete
     - how do I cancel the current operation? Is it even cancellable?
+- operating system limits
+- global subsystems (singletons)
+    - logging
+    - execution resources
+    - memory allocator
+    - shared network connections
 
-When we write code, we absolutely rely on most of this context being irrelevant
-at any one time. However, *which* bits are irrelevant is up to convention and
-discipline. This is precisely the problem with procedural languages.
+==DOWN==
+
+### Implicit context (cont 3):
+
+- state machines: which *state* you're in?
+- What execution context is running the code?
+    - high priority thread
+    - main thread
+    - low priority thread
+    - top-half of a signal handler
+    - GPU, NUMA node, IO thread, compute thread, which threadpool?????
+
+==DOWN==
+
+For every Context grows a Monad.
+
+-- Teta Pehta (paraphrased)
+
+<!-- .slide: data-background-image="image/teta-pehta.jpg" data-background-position: "right" -->
+
+==DOWN==
+
+(Monad is meant loosely - we mean a compositional context. Functor,
+Applicative, Monad, and some other things are all valid here).
+
+==SLIDE==
+
+## Limiting context
+
+Most context is irrelevant at any one time.
+
+*Which* part is up to convention and discipline.
+
+Procedural languages have problems encoding proofs about context.
+
+==DOWN==
+
+In functional languages, all context is explicit.
+
+This helps proofs.
+
+Can we be disciplined in c++?
+
+==SLIDE==
+
+## Tools
+
+We will need tools.
+
+Banish all context-accessors from business logic into named contexts.
+
+And we will explicitly give access.
+
+And we will be free.
+
+<!--
 
 Let's see how we can cut down on the amount of context we need to consider.
 
@@ -114,76 +254,133 @@ able to trust our code, and that means code we're calling, too. We'll need to
 make the assumption that there is no access of the "global context" from
 anywhere. Instead, we will supply the needed context explicitly.
 
-Yeah, yeah, all well and good, but doesn't that make my function calls take an
-insane number of parameters?
+-->
 
-Well, yes, it does, but have you considered making your *requirements*
-structure flatter?
+==DOWN==
+
+Apprentice: But master, my function has 43 parameters?
+
+Master: you were blind, but now you see.
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/wizard-monad.png" data-background-size="contain" -->
+
+==DOWN==
 
 Zen of python: flat is better than nested.
 
-Applying this rule has a forcing-function effect of pushing mutation (requires
-context), IO (requires io context), things that can fail (data validation), and
-things that bifurcate control paths (state) up the call graph, closer to main().
+Have you considered flattening out your dependencies?
 
-This is *good*. It allows more of the program to be context-free.
+==DOWN==
+
+<!-- .slide: data-background-image="image/magma-glowhouse.png" data-background-size="contain" -->
+
+==DOWN==
 
 Design for laziness: Make the right things painful.
 
+This is *good*. It allows more of the program to be context-free.
+
+Push control flow, mutation, and I/O towards `main()`.
+
+==SLIDE==
+
+## Quick example
+
+C++ has exceptions:
+
 ```cpp
 try { g(); }
-catch (same_as<E1, E2, E3> auto&& exc) { /* no you don't says C++ */ }
+catch (same_as<E1, E2, E3> auto&& exc) {
+    /* no you don't says C++ */
+}
 ```
 
+You need to know what `g` throws.
+
+Polymorphic runtime matching. No generic matching.
+
+==DOWN==
+
+This is better:
+
 ```cpp
-g() | transform_error([](std::same_as<E1, E2, E3> auto&& exc) {
-    // ahhh, yiss
-});
+g() | match_error(
+        [](std::same_as<E1, E2, E3> auto&& exc) {
+            // ahhh, yiss
+        });
 ```
 
-This also fails to compile if you don't handle every exception. You want to let
-some through? Do it explicitly:
+==DOWN==
+
+You don't handle every exception? Fail to compile.
+
+You want to let some through? Do it explicitly:
 
 ```cpp
-g() | upon_error(
-        [](std::same_as<E1, E2, E3> auto&& exc) {},
-        [](auto&& x){return FWD(x);} // also known as `id`
+g() | match_error(
+        overload{
+            [](std::same_as<E1, E2, E3> auto&& exc) {/*...*/},
+            left /* id-on-error */
+        }
     );
 ```
 
-This gracefully handles exceptions, finally. I just showed you a glimpse of an
-Error+Choice monad. We'll talk about it more later.
+A glimpse of the validation monad. We'll talk about it more later.
 
-Before we go into monads, let's run down the basic features C++ gives us that
-we can use to make our functional generic programming tools:
 
-- templates: we'll get literally nowhere without these.
-- structs and closures: ditto
-- function overloading: this is basically the "Choice" compositional pattern built into the language.
-- operator overloading: we need some kind of a programmable semicolon so we can
+==SLIDE==
+
+## "basic" needed language features
+
+- templates <!-- we'll get literally nowhere without these. -->
+- structs and closures
+- function overloading <!-- this is basically the "Choice" compositional pattern built into the language. -->
+- operator overloading <!-- we need some kind of a programmable semicolon so we can
   drag along "context". There have been workflow operators proposed, but we'll
-  use `|`, because that's what ranges does anyway.
-- deduction guides: critical; things get really verbose without them, and thus unusable
-- concepts: we'll need these for pattern-matching everywhere.
+  use `|`, because that's what ranges does anyway. -->
+- deduction guides <!-- critical; things get really verbose without them, and thus unusable -->
+- concepts <!--: we'll need these for pattern-matching everywhere. -->
 
-We will also need a support library. I'll show you usage; unfortunately, there
-are no open-source solutions for most of these, but they're not that difficult
-to implement. Also, names might be familiar, but they are by no means standard,
-and I welcome renaming suggestions.
+==DOWN==
 
-The final guideline:
+## Support library
+
+- std::ranges - C++'s answer to the List monad
+- std::execution - Async monad (later)
+- std::optional - Maybe
+- std::expected - Error
+- Validation: not standard
+- I/O: better done with std::execution
+- State: what do you think OOP is?
+- Environment: not standard
+
+==DOWN==
+
+## The final guideline
 
 Name common patterns and control flow.
 
-## Compositional contexts and where to find them
+==DOWN==
 
-### Try multiple things and return the first one that succeeded
+<!-- .slide: data-background-image="image/viaduct-distance.png" data-background-size="contain" -->
+
+==SLIDE==
+
+## Maybe / std::optional
+
+Try multiple things and return the first one that succeeded.
+
+==DOWN==
 
 Procedural way:
 
 ```cpp
-auto is_hostname_in_args(int, char const* const*) -> bool;
-auto get_hostname_from_args(int, char const* const*) -> char const*;
+auto is_hostname_in_args(int, char const* const*)
+    -> bool;
+auto get_hostname_from_args(int, char const* const*)
+    -> char const*;
 auto get_target_hostname(
             int argc, char const* const* argv,
             std::string default_hostname)
@@ -192,7 +389,13 @@ auto get_target_hostname(
     if (is_hostname_in_args(argc, argv)) {
         // perhaps... might use optional here too?
         return get_hostname_from_args(argc, argv);
-    } 
+    }
+    // <next slide>
+```
+
+==DOWN==
+
+```cpp
     // ad-hoc Maybe
     if (char const* maybe_host = getenv("SERVICE_HOSTNAME");
         (maybe_host != nullptr) || (*maybe_host == '\0')) {
@@ -202,25 +405,42 @@ auto get_target_hostname(
 }
 ```
 
-It's much better if things speak the same language. For "try multiple things",
-the context is usually "Maybe", modeled by `optional` in c++:
+==DOWN==
 
-First, we prepare a few general-purpose functions that all speak `optional`:
+## Functional
 
-This one should always have had a decent interface:
+First, adapt to uniformity.
+
+The "try multiple things" context is "Maybe", modeled by `optional<T>` in c++:
+
+==DOWN==
+
+Before: query/getter pair
 
 ```cpp
-// from pair of query & getter to just a getter
-auto is_hostname_in_args(int, char const* const*) -> bool;
-auto get_hostname_from_args(int, char const* const*) -> char const*;
-// to:
+auto is_hostname_in_args(int, char const* const*)
+    -> bool;
+auto get_hostname_from_args(int, char const* const*)
+    -> char const*;
+```
+
+After: `std::optional`-returning object.
+
+```cpp
 inline constexpr auto maybe_hostname_from_args = 
     [](int argc, char const* const* argv) 
         -> std::optional<std::string> {/*...*/}
 ```
 
-We can transform the ad-hod "maybe" with nullptr return of `std::getenv` into
-an optional:
+==DOWN==
+
+Before: `nullptr`-on-nothing
+
+```cpp
+auto std::getenv(char const*) -> char const*;
+```
+
+After: `std::optional`
 
 ```cpp
 inline constexpr auto get_env = [](std::string const& varname)
@@ -233,7 +453,11 @@ inline constexpr auto get_env = [](std::string const& varname)
 };
 ```
 
-For the nonempty bit, we'll need a `filter`:
+==DOWN==
+
+## Tool: filter
+
+For the "nonempty" bit, we'll need a `filter`:
 
 ```cpp
 inline constexpr auto filter = [](auto predicate) {
@@ -247,10 +471,14 @@ inline constexpr auto filter = [](auto predicate) {
 };
 ```
 
+==DOWN==
+
 And we can finally put it together:
 
 ```cpp
-inline constexpr auto nonempty = [](auto const& s){return !s.empty();};
+inline constexpr auto nonempty =
+    [](auto const& s){return !s.empty();};
+
 auto get_target_hostname(
             int argc, char const* const* argv,
             std::string const& default_hostname)
@@ -264,6 +492,8 @@ auto get_target_hostname(
           .value_or(auto(default_hostname));
 }
 ```
+
+==DOWN==
 
 It's a bit of a mouthful, mostly because of the annoying way we defined filter.
 Let's try again:
