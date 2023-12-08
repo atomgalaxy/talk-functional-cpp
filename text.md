@@ -405,7 +405,7 @@ auto get_target_hostname(
 }
 ```
 
-==DOWN==
+==SLIDE==
 
 ## Functional
 
@@ -453,7 +453,7 @@ inline constexpr auto get_env = [](std::string const& varname)
 };
 ```
 
-==DOWN==
+==SLIDE==
 
 ## Tool: filter
 
@@ -493,37 +493,52 @@ auto get_target_hostname(
 }
 ```
 
+Blech.
+
 ==DOWN==
 
-It's a bit of a mouthful, mostly because of the annoying way we defined filter.
-Let's try again:
+We defined filter wrong. Let's fix it.
 
 ```cpp
 inline constexpr struct filter_t {
     template <typename P>
     struct closure { P pred; };
 
-    template <an_optional Opt, typename P>
-    friend constexpr auto operator|(Opt&& opt, closure<P> const& cl) 
-            -> std::decay_t<Opt> {
-        using opt_t = std::decay_t<Opt>;
-        return std::forward<Opt>(opt).and_then([&]<class T>(T&& v) -> opt_t {
-            if (std::invoke(cl.pred, v)) {
-                return opt_t(std::forward<T>(v));
-            }
-            return std::nullopt;
-        });
+    template <typename P>
+    constexpr auto operator()(P&& predicate) const {
+        return closure{std::forward<P>(predicate)};
     }
 
-    constexpr auto operator()(auto&& predicate) const {
-        return closure{std::forward<decltype(predicate)>(predicate)};
-    }
+    // operator|()
 } filter;
 ```
 
-Ah, yes, the wonderful paths we must walk to enable `|`-based composition.
+==DOWN==
 
-However, this enables us to omit the `and_then`:
+... and the operator
+
+```cpp
+template <an_optional Opt, typename P>
+friend constexpr /* hidden friend */
+auto operator|(Opt&& opt, closure<P> const& cl) 
+        -> std::decay_t<Opt> {
+    using opt_t = std::decay_t<Opt>;
+    return std::forward<Opt>(opt)
+           .and_then([&]<class T>(T&& v) -> opt_t {
+        if (std::invoke(cl.pred, v)) {
+            return opt_t(std::forward<T>(v));
+        }
+        return std::nullopt;
+    });
+}
+
+```
+
+The wonderful paths to `|`-based composition.
+
+==DOWN==
+
+We can omit the `and_then`:
 
 ```cpp
 auto get_target_hostname(
@@ -531,44 +546,63 @@ auto get_target_hostname(
             std::string const& default_hostname)
         -> std::string {
     return maybe_hostname_from_args(argc, argv)
-          .or_else([]{ return get_env("SERVICE_HOSTNAME") | filter(nonempty); })
+          .or_else([]{ return get_env("SERVICE_HOSTNAME")
+                            | filter(nonempty); })
           .value_or(auto(default_hostname));
 }
 ```
 
+==DOWN==
+
 We need a concept for the above:
 
 ```cpp
-// fastest-to-compile is_instantiation_of I know of, as of right now
+// fastest-to-compile is_instantiation_of I know of
 template <typename X>
 inline constexpr bool _an_optional_v = false;
 template <typename T>
-inline constexpr bool _an_optional_v<std::optional<T>&> = true;
+inline constexpr bool _an_optional_v<std::optional<T>&>
+    = true;
 template <typename T>
-inline constexpr bool _an_optional_v<std::optional<T> const&> = true;
+inline constexpr bool _an_optional_v<std::optional<T> const&>
+    = true;
 
 template <typename X>
 concept an_optional = _an_optional_v<X&>;
 ```
 
-You can assume everything called `an_XXX` or `a_YYY` is a concept.
+==DOWN==
 
-Last thing: fix the defaulting. If you don't need to make a choice, why make it?
+Everything called `an_XXX` or `a_YYY` is a concept.
 
-It's actually more efficient to just let the caller do it:
+==DOWN==
+
+<!-- .slide: data-background-image="image/viaduct.png" data-background-size="contain" -->
+
+==SLIDE==
+
+## Fix the defaulting.
+
+If you don't need to make a choice, why make it?
+
+Just let the caller do it:
 
 ```cpp
-auto maybe_target_hostname_from_params(int argc, char const* const* argv)
+auto maybe_target_hostname_from_params(
+            int argc, char const* const* argv)
         -> std::string {
     return maybe_hostname_from_args(argc, argv)
-          .or_else([]{ return get_env("SERVICE_HOSTNAME") | filter(nonempty); });
+          .or_else([]{ return get_env("SERVICE_HOSTNAME")
+                            | filter(nonempty); });
+          // <-- no more default
 }
 ```
 
+==DOWN==
 
 Usage:
 
-```
+```cpp
 int main(int argc, char** argv) {
     auto const config_file =
         maybe_config_file_from_params(argc, argv)
@@ -583,6 +617,12 @@ int main(int argc, char** argv) {
 This isn't always true - you might choose to do it in one or the other location
 depending on the desired semantics.
 
+==DOWN==
+
+<!-- .slide: data-background-image="image/wizard-floor-baubles.png" data-background-size="contain" -->
+
+==SLIDE==
+
 ## Packs
 
 There's another thing that is very nice to do when you want to compose these --
@@ -590,14 +630,20 @@ packing.
 
 ```cpp
 auto connect(config c) -> std::optional<socket_addr> {
-    return (c.get_maybe("hostname") & c.get_maybe("port")) // an optional-pack
-        .transform([](std::string && hostname, int port){
+    return
+        (c.get_maybe("hostname")
+        & c.get_maybe("port"))     // an optional-pack
+        | transform([](std::string && hostname, int port){
              return socket_addr{std::move(hostname), port};
         });
 }
 ```
 
-This is a pretty common pattern, so it's helpful to have a constructor-lift:
+==DOWN==
+
+This is a common.
+
+We name common patterns.
 
 ```cpp
 template <typename T>
@@ -605,21 +651,37 @@ inline constexpr make = []<typename... Ts>(Ts&&... args) {
     return T(std::forward<Ts>(args)...);
 };
 auto connect(config c) -> std::optional<socket_addr> {
-    return (c.get_maybe("hostname") & c.get_maybe("port")) // an optional-pack
+    return (c.get_maybe("hostname")
+           & c.get_maybe("port"))
         .transform(make<socket_addr>);
+        //         ^^^^^^^^^^^^^^^^^
 }
 ```
 
-For completeness: the table of monadic operations on `optional`:
+==DOWN==
+
+## Monadic operations on `optional`:
 
 ```
-and_then  :: optional<T>, (f(T) -> optional<U>) -> optional<U>;
-transform :: optional<T>, (f(T) -> U)           -> optional<U>;
-or_else   :: optional<T>, (F()  -> T)           -> optional<T>;
-value_or  :: optional<T>, T                     -> T;
+and_then  :: opt<T>, (f(T) -> opt<U>) -> opt<U>;
+transform :: opt<T>, (f(T) -> U)      -> opt<U>;
+or_else   :: opt<T>, (F()  -> T)      -> opt<T>;
+value_or  :: opt<T>, T                -> T;
 ```
 
-## Error compositional pattern - `std::expected<T, E>`
+==DOWN==
+
+<!-- .slide: data-background-image="image/wizard-letterballoons.png" data-background-size="contain" -->
+
+==SLIDE==
+
+## Error: `expected<T, E>`
+
+Instead of `nullopt`, we get `E`.
+
+The flavor is different. Error is error, maybe is maybe.
+
+<!--
 
 The way C++ chose to model this is a tad different from the usual way of doing
 `Error<E, T>`, where the constructors are `left` for errors and `right` for
@@ -628,28 +690,52 @@ success.
 The `Error` monad looks superficially related to `Maybe`, but the two have a
 very different flavor.
 
+-->
+
+==DOWN==
+
+There are as many `expected`s as there are `E`s.
+
+<!--
 First, there is only one `Maybe` - but there are as many `Error`s as there are
 error types.
 
 Observe and contrast the operation table of monadic operations of `expected<T, E>`:
+-->
+
+==DOWN==
+
+Note the table:
 
 ```
-and_then  :: expected<T, E>, (f(T) -> expected<U, E>) -> expected<U, E>;
-transform :: expected<T, E>, (f(T) -> U)              -> expected<U, E>;
-or_else   :: expected<T, E>, (F()  -> T)              -> expected<T, E>;
-transform_error :: expected<T, E>, (f(E) -> E')       -> expected<T, E'>;
-value_or  :: expected<T, E>, T                        -> T;
+and_then  :: exp<T, E>, (f(T) -> exp<U, E>) -> exp<U, E>;
+transform :: exp<T, E>, (f(T) -> U)         -> exp<U, E>;
+or_else   :: exp<T, E>, (F()  -> T)         -> exp<T, E>;
+transform_error :: exp<T, E>, (f(E) -> E')  -> exp<T, E'>;
+value_or  :: exp<T, E>, T                   -> T;
 ```
 
-On the face of it, we just gained `transform_error`, and the rest look like
-`optional`. However, notice that `and_then` cannot change `E`, and neither can
-`or_else`. This means we actually got an `optional`-per-`E`.
+We gained `transform_error`, the rest look like `optional`'s.
 
-This makes `expected` effectively a domain-based composition type, not a
-general-purpose one.
+`and_then` cannot change `E`.
 
-For instance, you might want to use it for a compositional parser
-infrastructure, where every parser has the signature of
+Neither can `or_else`.
+
+This means we actually got an `optional`-per-`E`.
+
+==DOWN==
+
+`expected` is a domain-based composition type.
+
+It is *not* better exceptions.
+
+==SLIDE==
+
+## Good fit
+
+Compositional parser infrastructure.
+
+Every parser's signature is
 
 ```cpp
 auto subgrammar(std::span<char const>)
@@ -659,15 +745,22 @@ auto subgrammar(std::span<char const>)
         >;
 ```
 
-Nevertheless, this is one of the most useful compositional tools when combined
-with a variant implementation that's a bit more fully-featured than the
-standard one.
+==DOWN==
 
-For instance, when dealing with validating json responses one gets back from
-web services, it's really nice to be able to do the following:
+Seems limited.
+
+It is.
+
+Validation is better (later).
+
+==SLIDE==
+
+## Error Packs
+
+Still, Error is very useful.
 
 ```cpp
-// transform_nothing:: optional<T>, (f() -> E) -> expected<T, E>
+// transform_nothing:: opt<T>, (f() -> E) -> exp<T, E>
 auto parse_response(json const& doc)
     -> std::expected<Response, ParseError>
 {
@@ -683,42 +776,67 @@ auto parse_response(json const& doc)
                 []{return ParseError("id is required");})
             | parse_int
             | transform(make<Id>)
-        )
+        ) // expected<Id, ParseError>
         & /*...*/
         ) // expected-pack<Version, Id, ..., ParseError>
-        .transform(make<Response>);
+        | transform(make<Response>);
 }
 ```
 
-The nice thing here is that it's really easy to see we didn't forget any error
-checking. There's no way to make the intermediate results without going through
-a parser, validator, and constructor, and there is no way to make a `Response`
-without having everything go correctly.
+==DOWN==
 
-We used another really important tool here - strong types. Yes, Version is just
-an integer, but we can't make a `Response` without a `Version`, not just any
-`int`. This catches a lot of bugs.
+- We didn't forget error checking.
+- No way to make a `Response` on failure.
+- We validate everything due to strong types.
 
-The general guideline we had was that only plausible business logic should
-compile. That meant, for instance, that `price + price` didn't make any sense -
-`price + price_delta` did. Technically, prices of instruments are a point space
-over a vector space of `price_delta`. We modeled that. This is also modeled in
-`std::chrono`.
+==DOWN==
 
-## Dealing with multiple error types (take 1)
+## Strong types
 
-In order to deal with multiple error types, we're going to need a better
-variant with some fun autodetecting `transform` operations.
+- Version is just an integer
+- constructor validates
+- Response takes a Version
+    - We can't make a `Response` without a `Version`
 
-Let's pretend `variant` is a compositional context. What is its table of basis
-operations?
+==DOWN==
+
+Only plausible business logic should compile.
+
+Encode things in types until that is true.
+
+==DOWN==
+
+```
+Price x, y;
+x + y; // does not compile
+PriceDelta d;
+Price r = x + d; // compiles
+```
+
+`Price` is a point-space over the integral module of `PriceDelta`.
+
+`std::chrono` does this too.
+
+<!-- .slide: data-background-image="image/viaduct-pipes.png" data-background-size="contain" -->
+
+==SLIDE==
+
+## Dealing with multiple Es (take 1)
+
+We're going to need a better `variant`.
+
+==DOWN==
+
+If `variant` is a compositional context, what are the operations?
 
 ```
 visit  :: variant<T, U, ...>, (f(T|U|...) -> V) -> V;
 ???
 ```
 
-We probably want some equivalent of `transform`, at least.
+==DOWN==
+
+We need `transform`, at least.
 
 ```
 visit     :: variant<T, U, ...>, (f(T|U|...) -> V) -> V;
@@ -727,28 +845,40 @@ transform ::
     -> variant<T', U', ...>;
 ```
 
-The usual name for `visit` is `match`, and the name for `transform` is `map` or
-`fmap`.
+The usual name for `visit` is `match`.
 
-There's another operation that is really useful to have - some kind of `bind`
-where overloads can return partial variants:
+The name for `transform` is `map` or `fmap`.
+
+==DOWN==
+
+### Gettin' fancy
+
+Some kind of `bind` with partial variants: `pmap`
 
 ```
-pmap :: v<T, U, ...>, overload{f(T)->v<T',T''>, f(U)->v<U', U''>, ...}
-    -> v<T, T'', U', U'', ...>;
+pmap :: v<T, U, ...>,
+        overload{f(T)->v<X, Y>, f(U)->v<Z, W>, ...}
+    -> v<X, Y, Z, W, ...>;
 ```
 
+(I totally made this name up)
 
-As an example, let's take a look at a state machine:
+==DOWN==
+
+### Example: a state machine:
 
 ```cpp
-using State = variant<Initialized, Connecting, Connected, Disconnected, Fail>;
-using Message = variant<Connect, Stop, Data, UnexpectedDisconnect>;
+using State = variant<Initialized, Connecting,
+                      Connected, Disconnected, Fail>;
+using Message = variant<Connect, Stop, Data,
+                        UnexpectedDisconnect>;
 template <typename X>
 concept a_live_state = std::same_as<X, Initialized> 
                     || std::same_as<X, Connecting>
                     || std::same_as<X, Connected>;
 ```
+
+==DOWN==
 
 We will also introduce multiple dispatch using `pmap` over a `variant-pack`:
 
@@ -769,35 +899,53 @@ auto transition(State s, Message m) {
 }
 ```
 
-`pmap` is doing a lot of heavy lifting here. It's getting the `invoke_result`
+`pmap` concatenates all the results.
+
+
+<!--
+
+It's getting the `invoke_result`.
+
 of every invocation possibility, concatenating all the possibilities in the
 variants, and deduplicating them to arrive at the resulting type.
 
 Once that's done, it's turning the construction of the resulting variant into
 the construction of the full one, behind the scenes.
 
+
 To make things a bit more efficient, we can introduce a
 `partial<Type>(in-place-args)` that we can return instead, or interpret
 `variant<lazily<T>, lazily<U>>` as in-place constructors for `T` and `U`.
 
+-->
+
+
+==SLIDE==
 ### Back to our `expected<T, variant<Es...>>`
 
 Let's try to use our error monad with this improved `variant` on the `Error`
 side:
 
 ```cpp
-open(path) // expected<File, variant<DoesNotExist, PermissionsError>>
+open(path) // expected<File, variant<DoesNotExist,
+                                     PermError>>
     | and_then(
         read_line // expected<std::string, IOError>
         | transform_error(???) // oops
     )
 ```
 
-Can't. Need to try this again:
+Can't.
+
+==DOWN==
+
+Need to try this again:
 
 ```cpp
-using AllErrors = variant<DoesNotExist, PermissionsError, IOError>;
-open(path) // expected<File, variant<DoesNotExist, PermissionsError>>
+using AllErrors = variant<DoesNotExist, PermError,
+                          IOError>;
+open(path) // expected<File, variant<DoesNotExist,
+                                     PermError>>
     | transform_error(match(make<AllErrors>))
     // blech
     | and_then(
@@ -811,38 +959,46 @@ open(path) // expected<File, variant<DoesNotExist, PermissionsError>>
 
 We need something less annoying that accumulates error types.
 
+==SLIDE==
 ## Monadic mixins -- validations
 
+<!--
 Returning back to our `expected` with multiple error types - we need to make
 `expected` work with that. We call that the `validation` context.
 
-Validations basically "mix in" the `variant` on the `error` side, instead of
-merely composing them. This allows us to compute types more effectively, since
-we're relaxing the restriction on a single error type.
+-->
 
-Let's try the example again:
+Validation "mixes in" the `variant` on the `error` side.
+
+It also *computes* the types on the Error side.
 
 ```cpp
-auto version_or_error = open(path) // validation<File, DoesNotExist, PermissionsError>
-    | and_then(read_line           // expected<std::string, IOError>
-    ) // validation<std::string, DoesNotExist, PermissionsError, IOError>
+auto version_or_error 
+    = open(path)          // validation<File, DoesNotExist,
+                          //            PermError>
+    | and_then(read_line  // expected<std::string, IOError>
+    ) // validation<std::string, DoesNotExist,
+      //            PermError, IOError>
     | and_then(parse_version);
-    // validation<Version, DoesNotExist, PermissionsError, IOError, SyntaxError>
+    // validation<Version, DoesNotExist, PermError,
+                           IOError, SyntaxError>
 ```
+
+==DOWN==
 
 `validation` is a closed-polymorphic equivalent to c++ exceptions.
 
-And, true-to-form, we can also handle the errors generically, unlike `catch`
-clauses:
+We can also handle the errors generically.
 
 ```cpp
 template <typename X, typename... Ts>
-concept any_of = (... || std::same_as<std::remove_cvref_t<X>, Ts>);
+concept any_of
+    = (... || std::same_as<std::remove_cvref_t<X>, Ts>);
 
 version_or_error
     | match_error( // match may return void
         overload{
-        [](any_of<DoesNotExist, PermissionsError, IOError> auto&& e) {
+        [](any_of<DoesNotExist, PermError, IOError> auto&& e) {
             std::print("could not read file {}", e.filename);
         },
         [](SyntaxError const& e) {
@@ -851,13 +1007,38 @@ version_or_error
     });
 ```
 
+==DOWN==
+
+## FIN
+
 `transform_error` of course exists, but the `match` family doesn't require me
 to invent something to return.
 
-Recap: we mixed in the `variant` context into the `expected` context. Are there
+## Recap:
+
+We mixed in the `variant` context into the `expected` context. Are there
 other mixed-in contexts?
 
+==SLIDE==
+## Conclusion
 
+In order to name common control flow patterns, we reach for named compositional
+contexts, some of which are monads.
+
+We explored the following contexts today:
+
+- `optional` or "Maybe"
+- `expected` or "Error"
+- `variant` or "Choice"
+- `validation`
+
+==DOWN==
+
+<!-- .slide: data-background-image="image/viaduct-balthazar.png" data-background-size="contain" -->
+
+
+<!--
+BONUS
 ## The biggest context: the async context
 
 I am, of course, talking about `p2300`, `std::execution`, or, as you might know
@@ -882,15 +1063,4 @@ correct async code a breeze.
 However, we only used it for the bits that concerned execution and async
 behavior. For the rest, we used the above contexts, and strong types.
 
-## Conclusion
-
-In order to name common control flow patterns, we reach for named compositional
-contexts, some of which are monads.
-
-We explored the following contexts today:
-
-- `optional` or "Maybe"
-- `expected` or "Error"
-- `variant` or "Choice"
-- `validation`
-
+-->
