@@ -1,44 +1,112 @@
-# (Fun)ctional c++
+<!-- .slide: data-background-image="image/meetup-01-social.png" data-background-position: "right" -->
+==DOWN==
+<!-- .slide: data-background-image="image/meetup-02-gold-sponsors.png" data-background-position: "right" -->
+==DOWN==
+<!-- .slide: data-background-image="image/meetup-03-bronze-sponsors.png" data-background-position: "right" -->
+==DOWN==
+<!-- .slide: data-background-image="image/meetup-01-social.png" data-background-position: "right" -->
+==SLIDE==
+# Functional C++
 
 Gašper Ažman
 
-2023-12-05
+<small>2024-04-25</small>
 
-C++ London Meetup
+<img src="image/nycpp-logo.jpg" alt="NYC++ Meetup" style="height: 6ex; vertical-align: bottom;" />
+<img src="image/citsec-logo.jpg" alt="Citadel Securities" style="height: 6ex; vertical-align: bottom;" />
 
-==SLIDE==
-
-<!-- .slide: data-background-image="image/wizard-glitch.png" data-background-size="contain" -->
 
 ==SLIDE==
 
-## Disclaimers
+## Legal Disclaimers
+
+
+This is not investment advice.
+
+Citadel Securities is my employer and enabled a lot of this research.
+
+None of this code or text is endorsed by <br>Citadel Securities
+
+These words are my own.
+
+==SLIDE==
+
+## Calling Card
+
+- C++ since 2000
+- MSc in Graph Theory
+- A9.com Search Infrastructure
+- Citadel, then CitSec
+
+Notes:
+
+- Worked with Stepanov (SGI), Tom London, John Reiser (Bell Labs)
+- I was at the _Palo Alto Meeting_ for proto-concepts
 
 ==DOWN==
 
-**This is slide code.**
+## Calling Card: C++
+
+- 2016: British Standards Institute and WG21
+- Now: co-chair of SG4: Networking
+
+==DOWN==
+
+## C++20
+
+- `using enum`
+- `operator<=>` fixes
+
+==DOWN==
+
+## C++23
+
+Deducing `*this`
+
+
+```cpp
+constexpr auto fibonacci = [](this auto&& self, int x) {
+    return x <= 1 ? 1 : x + self(x-1);
+};
+```
+
+Notes:
+
+`Y`-combinator
+
+==DOWN==
+
+## C++26
+
+- [P2900](http://wg21.link/P2900) Contracts
+- [P2830](http://wg21.link/P2830) `constexpr` type sorting 
+- [P2825](http://wg21.link/P2825) `declcall` 
+- [P2926](http://wg21.link/P2926) Expression Aliases 
+- [P2300](http://wg21.link/P2300) `std::execution` implementation
+- [P2989](http://wg21.link/P2989) Universal Template Parameters
+- [P2841](http://wg21.link/P2841) Concept and variable-template template-parameters
+
+==SLIDE==
+
+## This is slide code
 
 ==DOWN==
 
 ## Omitted
 
-- noexcept propagation
-- SFINAE
-- nicer errors
-- all of the metaprogramming.
+- `noexcept` propagation
+- SFINAE-correctness                   <!-- .element: class="fragment" -->
+- nicer errors                         <!-- .element: class="fragment" -->
+- (almost) all of the metaprogramming. <!-- .element: class="fragment" -->
 
 ==DOWN==
 
 ## Ommitted (cont)
 
 - compile-time optimizations
-- lots of niceness
-- automatic inference
-- and tons of other stuff.
-
-==DOWN==
-
-<!-- .slide: data-background-image="image/forest-dwelling.png" data-background-size="contain" -->
+- lots of niceness                     <!-- .element: class="fragment" -->
+- automatic inference                  <!-- .element: class="fragment" -->
+- and tons of other stuff.             <!-- .element: class="fragment" -->
 
 ==DOWN==
 
@@ -48,26 +116,20 @@ I have proposals in flight that will make this better.
 
 ==DOWN==
 
-<!-- .slide: data-background-image="image/viaduct-balthazar.png" data-background-size="contain" -->
-
-==DOWN==
-
 The errors are bad.
 
 ==DOWN==
 
 The compile times are worse.
 
+(but getting better)
 
 ==DOWN==
 
-The runtime performance is actually pretty great
+The runtime performance is actually pretty great.
 
-(something something aliasing inlining constprop).
-
-==DOWN==
-
-<!-- .slide: data-background-image="image/viaduct.png" data-background-size="contain" -->
+Notes:
+Turns out letting compilers know more about your code helps optiimization
 
 ==DOWN==
 
@@ -77,11 +139,21 @@ Functional approaches pay off in the large.
 
 ==SLIDE==
 
+# The Library
+
+All the examples in this presentation actually run!
+
+https://github.com/libfn/functional
+
+By: **Bronek Kozicki** and **Alex Kremer**.
+
+Theory: **Bartosz Milewski** and yours truly.
+
+Under the ISC open-source license.
+
+==SLIDE==
+
 ## Optimize for correctness
-
-==DOWN==
-
-<!-- .slide: data-background-image="image/viaduct-balthazar.png" data-background-size="contain" -->
 
 ==DOWN==
 
@@ -91,23 +163,21 @@ Only plausible business logic should compile.
 
 Tests are CRCs for our proofs.
 
-The typesystem _is_ a proof system.
+The typesystem _is_ a proof system.           
 
 ==DOWN==
 
 Our brain does not fit a lot, and proofs are hard.
 
-We break down problems - but do we break down solutions?
+We break down problems;
+
+_but do we break down solutions_?
 
 ==DOWN==
 
-Context is the greatest complectifier of proof.
+Context makes proofs hard.
 
-==DOWN==
-
-<!-- .slide: data-background-image="image/dragon-tower.png" data-background-size="contain" -->
-
-<!--
+Notes:
 But we need to prove our code too! We do it intuitively, otherwise our code
 wouldn't work.
 
@@ -118,42 +188,37 @@ don't check for all of them. We should use the tools at our disposal.
 The most important tool we have is our brain, and it doesn't fit a whole lot.
 That's why we need ways of breaking down *solutions*, not just the problems
 we're working on. The less input to your proof, the easier it is.
--->
 
 ==SLIDE==
 
 ## Context of a line of code
+### Explicit context:
 
-<!--
+- local variables
+- function arguments
+- your object has state
+- ... and it changes!
+
+Notes:
 Functional programming is about tight control of relevant context, which aids
 local reasoning, which is critical for provability.
 
 Let's take a look at the context that's possibly relevant to a procedural line
 of code in a C++ program (most lines of code call at least one function).
--->
-
-### Explicit context:
-
-- function arguments
-- *this
-    - your object has state!
-- local variables
 
 ==DOWN==
 
 ### Block context:
 
-- loop condition (if in loop)
-- loop postcondition (if after loop)
+
+- loop condition (true in loop)
+- loop postcondition (true after loop)
     - [inverse of loop condition!]
 - current enclosing if-conditions
 - negations of previous if-conditions (we're in the else block)
 - catch (type)
 - are we processing a sequence? (ranged for-loops)
 
-==DOWN==
-
-<!-- .slide: data-background-image="image/dragon-timeline.png" data-background-size="contain" -->
 
 ==DOWN==
 
@@ -204,16 +269,44 @@ of code in a C++ program (most lines of code call at least one function).
 
 ==DOWN==
 
+## Example: procedural code
+
+```cpp
+auto dumb_depth_first_search(Node* start_node, auto&& op) {
+    std::vector todo{start_node}; std::set seen{start_node};
+    while (!todo.empty()) {            // post:!empty()
+        auto const node = todo.back(); // pre: !empty()
+        todo.pop_back();               // pre: !empty()
+        if (op(node)) { return node; } // post: !op(node)
+        for (auto const& child : node->children()) {
+            if (seen.contains(&child)) { continue; }
+            todo.push_back(&child); // pre: child not seen
+            seen.insert(&child);
+        }
+    } // post: todo.empty(), !op(node) for reachable nodes
+    return nullptr; // not found
+}
+```
+
+==DOWN==
+
 For every Context grows a Monad.
 
--- Teta Pehta (paraphrased)
+-- Teta Pehta
+
+<small>("For every disease there grows a flower")</small>
 
 <!-- .slide: data-background-image="image/teta-pehta.jpg" data-background-position: "right" -->
 
 ==DOWN==
 
-(Monad is meant loosely - we mean a compositional context. Functor,
-Applicative, Monad, and some other things are all valid here).
+Monad is meant loosely - I mean a compositional context.
+
+Functor, Applicative, Monad, and some other things are all valid here.
+
+_Technically_ we also need indexed monads and graded monads.
+
+We will not cover the theory.
 
 ==SLIDE==
 
@@ -264,17 +357,10 @@ Master: you were blind, but now you see.
 
 ==DOWN==
 
-<!-- .slide: data-background-image="image/wizard-monad.png" data-background-size="contain" -->
-
-==DOWN==
-
 Zen of python: flat is better than nested.
 
 Have you considered flattening out your dependencies?
 
-==DOWN==
-
-<!-- .slide: data-background-image="image/magma-glowhouse.png" data-background-size="contain" -->
 
 ==DOWN==
 
@@ -288,73 +374,115 @@ Push control flow, mutation, and I/O towards `main()`.
 
 ## Quick example
 
-C++ has exceptions:
+Given:
 
 ```cpp
-try { g(); }
-catch (same_as<E1, E2, E3> auto&& exc) {
+template <typename T, typename... Ts>
+concept any_of = 
+    (... || std::same_as<std::remove_cvref_t<T>, Ts>);
+```
+
+==DOWN==
+
+C++ has exceptions, and we want to catch any of them:
+
+```cpp [1|2|4]
+try { g(2); /*throws... what?*/ }
+catch (any_of<E1, E2, E3> auto&& exc) {
     /* no you don't says C++ */
-}
+} // did I get all of them?
 ```
 
 You need to know what `g` throws.
 
-Polymorphic runtime matching. No generic matching.
+Need polymorphic runtime matching.
+Need generic matching.
 
 ==DOWN==
 
 This is better:
 
 ```cpp
-g() | match_error(
-        [](std::same_as<E1, E2, E3> auto&& exc) {
-            // ahhh, yiss
-        });
+// auto g(int i) -> expected<int, sum<E1, E2, E3>>;
+auto r = g(2).transform_error(
+    [](any_of<E1, E2, E3> auto&&) {
+        return E2{};
+    });
 ```
+
+What's the type of `r`?
+<!-- .element: class="fragment" -->
+
+`expected<int, sum<E2>>`
+<!-- .element: class="fragment" -->
 
 ==DOWN==
 
 You don't handle every exception? Fail to compile.
 
+```cpp
+g(2).transform_error(
+    [](any_of<E1, E3> auto&&) {
+        return E2{};
+    });
+// ERROR: lambda not callable with E2
+```
+
+==DOWN==
+
 You want to let some through? Do it explicitly:
 
 ```cpp
-g() | match_error(
-        overload{
-            [](std::same_as<E1, E2, E3> auto&& exc) {/*...*/},
-            left /* id-on-error */
-        }
-    );
+auto r = g(2).transform_error(
+    fn::overload{
+        [](E1 const&) { return E2{}; },
+        fn::identity /* id-on-E2 and E3 */
+    }
+)
 ```
 
-A glimpse of the validation monad. We'll talk about it more later.
+What's the type of `r`?
+<!-- .element: class="fragment" -->
 
+`expected<int, sum<E2, E3>>`
+<!-- .element: class="fragment" -->
 
 ==SLIDE==
 
 ## "basic" needed language features
 
-- templates <!-- we'll get literally nowhere without these. -->
-- structs and closures
-- function overloading <!-- this is basically the "Choice" compositional pattern built into the language. -->
-- operator overloading <!-- we need some kind of a programmable semicolon so we can
-  drag along "context". There have been workflow operators proposed, but we'll
-  use `|`, because that's what ranges does anyway. -->
-- deduction guides <!-- critical; things get really verbose without them, and thus unusable -->
-- concepts <!--: we'll need these for pattern-matching everywhere. -->
+- functors and closures                           <!-- .element: class="fragment" -->
+- templates                                       <!-- .element: class="fragment" -->
+- function overloading                            <!-- .element: class="fragment" -->
+- <!-- .element: class="fragment" --> <code>operator|</code>
+- <!-- .element: class="fragment" --> <code>operator&</code>
+- CTAD - Constructor Template Argument Deduction  <!-- .element: class="fragment" -->
+- concepts                                        <!-- .element: class="fragment" -->
+
+Notes:
+templates: we'll get literally nowhere without these.
+
+function overloading: lets us define functions "in parts"
+
+operators: We need some kind of a programmable semicolon so we can drag along
+"context". There have been workflow operators proposed, but we'll use `|`,
+because that's what ranges does anyway.
+
+CTAD: things get really verbose without CTAD.
+
+concepts: pattern matching.
 
 ==DOWN==
 
-## Support library
+## Classic monads
 
-- std::ranges - C++'s answer to the List monad
-- std::execution - Async monad (later)
-- std::optional - Maybe
-- std::expected - Error
-- Validation: not standard
-- I/O: better done with std::execution
+- Maybe: `fn::optional`
+- Error: `fn::expected`
+- List: `std::ranges`
+- Async: `std::execution`
+- I/O: `std::execution` IO-resources
 - State: what do you think OOP is?
-- Environment: not standard
+- Environment: `std::execution` has `read()` and `write()`
 
 ==DOWN==
 
@@ -362,124 +490,122 @@ A glimpse of the validation monad. We'll talk about it more later.
 
 Name common patterns and control flow.
 
-==DOWN==
-
-<!-- .slide: data-background-image="image/viaduct-distance.png" data-background-size="contain" -->
 
 ==SLIDE==
 
-## Maybe / std::optional
+## `optional` - the Maybe monad
 
-Try multiple things and return the first one that succeeded.
+
+Pattern 1: (`optional` + `or_else`):
+
+_Try multiple things and return the first one that succeeded_.
 
 ==DOWN==
 
-Procedural way:
+Procedural way of implementing `get_hostname`:
 
 ```cpp
-auto is_hostname_in_args(int, char const* const*)
-    -> bool;
-auto get_hostname_from_args(int, char const* const*)
-    -> char const*;
-auto get_target_hostname(
-            int argc, char const* const* argv,
-            std::string default_hostname)
+auto is_hostname_in_args(int, char const* const*) -> bool;
+auto get_hostname_from_args(int, char const* const*) -> char const*;
+
+auto get_hostname(int argc, char const* const* argv,
+                  std::string default_hostname)
         -> std::string {
     // split query / getter
     if (is_hostname_in_args(argc, argv)) {
         // perhaps... might use optional here too?
         return get_hostname_from_args(argc, argv);
     }
-    // <next slide>
-```
-
-==DOWN==
-
-```cpp
     // ad-hoc Maybe
     if (char const* maybe_host = getenv("SERVICE_HOSTNAME");
-        (maybe_host != nullptr) || (*maybe_host == '\0')) {
+        (maybe_host != nullptr) || (*maybe_host != '\0')) {
         return maybe_host;
     }
     return default_hostname;
 }
 ```
+<!-- .element class="stretch" -->
 
 ==SLIDE==
 
-## Functional
+## Functional rewrite
 
 First, adapt to uniformity.
 
-The "try multiple things" context is "Maybe", modeled by `optional<T>` in c++:
-
 ==DOWN==
 
-Before: query/getter pair
+### Before: query/getter pair
 
 ```cpp
-auto is_hostname_in_args(int, char const* const*)
-    -> bool;
-auto get_hostname_from_args(int, char const* const*)
-    -> char const*;
+auto is_hostname_in_args(int, char const* const*) -> bool;
+auto get_hostname_from_args(int, char const* const*) -> char const*;
 ```
+<!-- .element: style="width:100%" -->
 
-After: `std::optional`-returning object.
+### After: `optional`-returning functor.
 
 ```cpp
-inline constexpr auto maybe_hostname_from_args = 
+constexpr auto maybe_hostname_from_args = 
     [](int argc, char const* const* argv) 
-        -> std::optional<std::string> {/*...*/}
+        -> std::optional<std::string> {
+    if (is_hostname_in_args(argc, argv)) {
+        return get_hostname_from_args(argc, argv);
+    }
+    return std::nullopt;
+};
 ```
+<!-- .element: style="width:100%" -->
 
 ==DOWN==
 
-Before: `nullptr`-on-nothing
+### Before: `nullptr`-on-nothing
 
 ```cpp
 auto std::getenv(char const*) -> char const*;
 ```
+<!-- .element: style="width:100%" -->
 
-After: `std::optional`
+### After: `nullopt`-on-nothing
 
 ```cpp
-inline constexpr auto get_env = [](std::string const& varname)
-        -> std::optional<std::string> {
+constexpr auto get_env = [](std::string const& varname)
+        -> optional<std::string> {
     if (char const* value = std::getenv(varname.c_str());
             value != nullptr) {
-        return std::optional(std::string(value));
+        return optional(std::string(value));
     }
     return {std::nullopt};
 };
 ```
+<!-- .element: style="width:100%" -->
 
 ==SLIDE==
 
-## Tool: filter
+## Tool: `filter`
 
-For the "nonempty" bit, we'll need a `filter`:
+For the "nonempty" bit, we'll want a `filter`:
 
-```cpp
-inline constexpr auto filter = [](auto predicate) {
-    return [p = std::move(predicate)]<class T>(T&& value)  {
-        using r_t = std::optional<std::decay_t<T>>;
-        if (std::invoke(p, value)) {
-            return r_t(std::forward<T>(value));
+```cpp [3,4,6|1,2]
+constexpr auto filter = [](auto predicate) {
+    return [=]<class T>(T&& value) -> optional<std::remove_cvref_t<T>> {
+        if (predicate(value)) {
+            return value;
         }
-        return r_t(std::nullopt);
+        return std::nullopt;
     };
 };
 ```
+<!-- .element style="width: 100%" -->
 
 ==DOWN==
 
-And we can finally put it together:
+First pass: put it together:
 
-```cpp
-inline constexpr auto nonempty =
+```cpp [1,2,10,11|8,9,14]
+constexpr auto nonempty =
     [](auto const& s){return !s.empty();};
 
-auto get_target_hostname(
+auto get_hostname(
             int argc, char const* const* argv,
             std::string const& default_hostname)
         -> std::string {
@@ -492,6 +618,7 @@ auto get_target_hostname(
           .value_or(auto(default_hostname));
 }
 ```
+<!-- .element: style="width:100%" -->
 
 Blech.
 
@@ -499,49 +626,35 @@ Blech.
 
 We defined filter wrong. Let's fix it.
 
-```cpp
-inline constexpr struct filter_t {
-    template <typename P>
-    struct closure { P pred; };
+```cpp [13,14,16|2-6|11|10,1,19]
+constexpr struct filter_t {
+  template <typename P> struct closure { P pred; };
 
-    template <typename P>
-    constexpr auto operator()(P&& predicate) const {
-        return closure{std::forward<P>(predicate)};
-    }
+  template <typename P>
+  constexpr auto operator()(P&& predicate) const {
+      return closure{std::forward<P>(predicate)};
+  }
 
-    // operator|()
+  template <fn::some_optional Opt, typename P>
+  friend constexpr auto operator|(Opt&& opt, closure<P> const& cl) {
+      return std::forward<Opt>(opt).and_then(
+          [&](auto&& v) -> std::remove_cvref_t<Opt> {
+              if (cl.pred(v)) {
+                  return v;
+              }
+              return std::nullopt;
+          });
+  }
 } filter;
 ```
-
-==DOWN==
-
-... and the operator
-
-```cpp
-template <an_optional Opt, typename P>
-friend constexpr /* hidden friend */
-auto operator|(Opt&& opt, closure<P> const& cl) 
-        -> std::decay_t<Opt> {
-    using opt_t = std::decay_t<Opt>;
-    return std::forward<Opt>(opt)
-           .and_then([&]<class T>(T&& v) -> opt_t {
-        if (std::invoke(cl.pred, v)) {
-            return opt_t(std::forward<T>(v));
-        }
-        return std::nullopt;
-    });
-}
-
-```
-
-The wonderful paths to `|`-based composition.
+<!-- .element class="stretch" -->
 
 ==DOWN==
 
 We can omit the `and_then`:
 
-```cpp
-auto get_target_hostname(
+```cpp [6,7]
+auto get_hostname(
             int argc, char const* const* argv,
             std::string const& default_hostname)
         -> std::string {
@@ -551,33 +664,37 @@ auto get_target_hostname(
           .value_or(auto(default_hostname));
 }
 ```
+<!-- .element: style="width:100%" -->
 
 ==DOWN==
 
-We need a concept for the above:
+### Aside: `some_optional`
+
+We needed a concept for the above:
 
 ```cpp
-// fastest-to-compile is_instantiation_of I know of
+// fastest-to-compile is_specialization_of I know of
 template <typename X>
-inline constexpr bool _an_optional_v = false;
+constexpr bool _some_optional_v = false;
 template <typename T>
-inline constexpr bool _an_optional_v<std::optional<T>&>
+constexpr bool _some_optional_v<fn::optional<T>&>
     = true;
 template <typename T>
-inline constexpr bool _an_optional_v<std::optional<T> const&>
+constexpr bool _some_optional_v<fn::optional<T> const&>
     = true;
+// same for std::optional
 
 template <typename X>
-concept an_optional = _an_optional_v<X&>;
+concept some_optional = _some_optional_v<X&>;
 ```
+<!-- .element: style="width:100%" -->
+
+`fn::some_optional` of course already exists; but you will need this for your
+own types.
 
 ==DOWN==
 
-Everything called `an_XXX` or `a_YYY` is a concept.
-
-==DOWN==
-
-<!-- .slide: data-background-image="image/viaduct.png" data-background-size="contain" -->
+Everything called `some_XXX` is a concept like the above.
 
 ==SLIDE==
 
@@ -588,8 +705,7 @@ If you don't need to make a choice, why make it?
 Just let the caller do it:
 
 ```cpp
-auto maybe_target_hostname_from_params(
-            int argc, char const* const* argv)
+auto maybe_hostname_from_outside(int argc, char const* const* argv)
         -> std::string {
     return maybe_hostname_from_args(argc, argv)
           .or_else([]{ return get_env("SERVICE_HOSTNAME")
@@ -597,6 +713,7 @@ auto maybe_target_hostname_from_params(
           // <-- no more default
 }
 ```
+<!-- .element style="width:100%" -->
 
 ==DOWN==
 
@@ -608,46 +725,48 @@ int main(int argc, char** argv) {
         maybe_config_file_from_params(argc, argv)
        .value_or({});
     auto const target_hostname =
-        maybe_target_hostname_from_params(argc, argv)
+        maybe_hostname_from_params(argc, argv)
        .or_else([&]{return config_file.maybe_get_hostname();})
        .value_or("default_hostname");
 }
 ```
+<!-- .element: style="width:100%" -->
 
 This isn't always true - you might choose to do it in one or the other location
 depending on the desired semantics.
-
-==DOWN==
-
-<!-- .slide: data-background-image="image/wizard-floor-baubles.png" data-background-size="contain" -->
 
 ==SLIDE==
 
 ## Packs
 
-There's another thing that is very nice to do when you want to compose these --
-packing.
+Multiple monadic arguments work as packs!
 
 ```cpp
-auto connect(config c) -> std::optional<socket_addr> {
+struct config {
+  template <typename T>
+  auto get_maybe(std::string const& key) -> fn::optional<T>;
+};
+struct socket_addr { std::string hostname; int port; };
+auto connect(config c) -> fn::optional<socket_addr> {
     return
-        (c.get_maybe("hostname")
-        & c.get_maybe("port"))     // an optional-pack
-        | transform([](std::string && hostname, int port){
+        (c.get_maybe<std::string>("hostname") & c.get_maybe<int>("port"))
+        // optional<pack<std::string, int>>
+        .transform([](std::string && hostname, int port){
              return socket_addr{std::move(hostname), port};
         });
 }
 ```
+<!-- .element: style="width:100%" -->
 
 ==DOWN==
 
-This is a common.
+Creating objects is common.
 
 We name common patterns.
 
-```cpp
+```cpp [2,3,8]
 template <typename T>
-inline constexpr make = []<typename... Ts>(Ts&&... args) {
+constexpr auto make = []<typename... Ts>(Ts&&... args) {
     return T(std::forward<Ts>(args)...);
 };
 auto connect(config c) -> std::optional<socket_addr> {
@@ -657,21 +776,20 @@ auto connect(config c) -> std::optional<socket_addr> {
         //         ^^^^^^^^^^^^^^^^^
 }
 ```
+<!-- .element: style="width:100%" -->
 
 ==DOWN==
 
-## Monadic operations on `optional`:
+## Function "lifts" on `optional<T>`:
 
+```cpp
+and_then  :: (T  -> opt<U>) -> (opt<T> -> opt<U>);
+transform :: (T  ->     U)  -> (opt<T> -> opt<U>);
+or_else   :: (() -> opt<T>) -> (opt<T> -> opt<T>);
+value_or  ::  T             -> (opt<T> -> T);
 ```
-and_then  :: opt<T>, (f(T) -> opt<U>) -> opt<U>;
-transform :: opt<T>, (f(T) -> U)      -> opt<U>;
-or_else   :: opt<T>, (F()  -> T)      -> opt<T>;
-value_or  :: opt<T>, T                -> T;
-```
 
-==DOWN==
-
-<!-- .slide: data-background-image="image/wizard-letterballoons.png" data-background-size="contain" -->
+`value_or` is an escape operation - final default.
 
 ==SLIDE==
 
@@ -681,7 +799,7 @@ Instead of `nullopt`, we get `E`.
 
 The flavor is different. Error is error, maybe is maybe.
 
-<!--
+Notes:
 
 The way C++ chose to model this is a tad different from the usual way of doing
 `Error<E, T>`, where the constructors are `left` for errors and `right` for
@@ -690,36 +808,32 @@ success.
 The `Error` monad looks superficially related to `Maybe`, but the two have a
 very different flavor.
 
--->
-
 ==DOWN==
 
 There are as many `expected`s as there are `E`s.
 
-<!--
+Notes:
 First, there is only one `Maybe` - but there are as many `Error`s as there are
 error types.
 
 Observe and contrast the operation table of monadic operations of `expected<T, E>`:
--->
 
 ==DOWN==
 
-Note the table:
+## Function lifts on `expected<T, E>`
 
+```cpp
+and_then        :: (T -> exp<U, E>) -> (exp<T, E> -> exp<U, E >);
+transform       :: (T ->     U    ) -> (exp<T, E> -> exp<U, E >);
+or_else         :: (E -> exp<T, E>) -> (exp<T, E> -> exp<T, E >);
+transform_error :: (E ->        E') -> (exp<T, E> -> exp<T, E'>);
+value_or        ::  T               -> (exp<T, E> -> T);
 ```
-and_then  :: exp<T, E>, (f(T) -> exp<U, E>) -> exp<U, E>;
-transform :: exp<T, E>, (f(T) -> U)         -> exp<U, E>;
-or_else   :: exp<T, E>, (F()  -> T)         -> exp<T, E>;
-transform_error :: exp<T, E>, (f(E) -> E')  -> exp<T, E'>;
-value_or  :: exp<T, E>, T                   -> T;
-```
 
-We gained `transform_error`, the rest look like `optional`'s.
-
-`and_then` cannot change `E`.
-
-Neither can `or_else`.
+- ++ `transform_error`
+- `or_else` now takes the error type.
+- `and_then` cannot change `E`.
+- Neither can `or_else`.
 
 This means we actually got an `optional`-per-`E`.
 
@@ -731,13 +845,14 @@ It is *not* better exceptions.
 
 ==SLIDE==
 
-## Good fit
+## Parsers: a good fit for `expected`
 
 Compositional parser infrastructure.
 
 Every parser's signature is
 
 ```cpp
+struct ParseError { std::span<char const> where; };
 auto subgrammar(std::span<char const>)
      -> std::expected<
            pair<SomeGrammarNode, std::span<char const>>,
@@ -747,33 +862,131 @@ auto subgrammar(std::span<char const>)
 
 ==DOWN==
 
+For instance, `parse_int`
+
+```cpp
+template <typename T>
+using parser_for = fn::expected<std::pair<T, std::span<char const>>, ParseError>;
+auto parse_int(std::span<char const> src)
+        -> parser_for<int> {
+    if (src.empty()) { return unexpected(ParseError(src)); }
+    bool negative = src[0] == '-';
+    if (negative || src[0] == '+') { src = src.subspan(1); }
+    if (src.empty()) { return unexpected(ParseError(src)); }
+    int result = 0;
+    if ('0' <= src[0] && '9' <= src[0]) {
+        result = src[0] - '0'; src = src.subspan(1);
+    }
+    while (!src.empty() && '0' <= src[0] && '9' <= src[0]) {
+        // not checking for overflow
+        result = result * 10 + (src[0] - '0'); src = src.subspan(1);
+    }
+    return std::pair{result * (-1 * negative), src};
+}
+```
+<!-- .element class="stretch" -->
+
+EEEEwwww.
+
+==DOWN==
+
+We could rework this to reduce the number of visible branches:
+
+```cpp
+auto parse_digit(std::span<char const> src) -> parser_for<int> {
+  return (!src.empty() && '0' <= src[0] && '9' <= src[0]) 
+         ? parser_for<int>(std::pair{src[0] - '0', src.subspan(1)});
+         : unexpected(ParseError(src));
+}
+
+auto parse_positive_digit(std::span<char const> src) -> parser_for<int> {
+    return parse_digit(src).and_then([&](auto r) {
+        return r.first > 0 ? parser_for<int>(r) 
+                           : unexpected(ParseError(src));
+    });
+}
+```
+<!-- .element style="width: 100%" -->
+
+==DOWN==
+
+Rework the "integral" portion...
+
+```cpp
+auto parse_unprefixed_int(std::span<char const> src)
+    -> fn::expected<std::pair<int, std::span<char const>>, ParseError> {
+    return parse_positive_digit(src)
+           .transform([&](auto p){
+        auto&& [result, rest] = p;
+        while (auto d = parse_digit(rest)) {
+            // not checking for overflow
+            result = result * 10 + d.value().first;
+            rest = d.value().second;
+        }
+        return std::pair{result, rest};
+    });
+}
+```
+<!-- .element style="width: 100%" -->
+
+==DOWN==
+
+The sign portion...
+
+```cpp
+auto parse_maybe_sign(std::span<char const> src) -> parser_for<int> {
+    if (src.empty()) { return unexpected(ParseError(src)); }
+    bool negative = src[0] == '-';
+    if (negative || src[0] == '+') {
+        return std::pair{negative:-1:1, src.subspan(1)};
+    }
+    return parse_digit(src) // just check it's a digit
+           .transform([&](auto&&){return std::pair{1, src};});
+}
+```
+<!-- .element style="width: 100%" -->
+
+==DOWN==
+
+And finally put it all together:
+
+```cpp
+auto parse_int(std::span<char const> src) -> parser_for<int> {
+    return parse_maybe_sign(src)
+        .and_then([](auto sign) {
+            return parse_unprefixed_int(sign.second)
+                .transform([&](auto p){
+                    return std::pair{sign.first * p.first, p.second};
+                });
+        });
+}
+```
+<!-- .element style="width: 100%" -->
+
+==DOWN==
+
 Seems limited.
 
 It is.
 
-Validation is better (later).
+A graded `expected` is better - we'll see it later.
 
 ==SLIDE==
 
 ## Error Packs
 
-Still, Error is very useful.
-
 ```cpp
-// transform_nothing:: opt<T>, (f() -> E) -> exp<T, E>
 auto parse_response(json const& doc)
-    -> std::expected<Response, ParseError>
+    -> fn::expected<Response, ParseError>
 {
     return (
         (doc.get_maybe("version") 
-            | transform_nothing(
-                []{return ParseError("version is required");})
+            | or_else([]{return ParseError("version is required");})
             | parse_version 
             | filter(eq(version{3, 14}), make<ParseError>)
         ) // expected<Version, ParseError>
         & (doc.get_maybe("id")
-            | transform_nothing(
-                []{return ParseError("id is required");})
+            | or_else([]{return ParseError("id is required");})
             | parse_int
             | transform(make<Id>)
         ) // expected<Id, ParseError>
@@ -782,6 +995,7 @@ auto parse_response(json const& doc)
         | transform(make<Response>);
 }
 ```
+<!-- .element class="stretch" -->
 
 ==DOWN==
 
@@ -789,7 +1003,7 @@ auto parse_response(json const& doc)
 - No way to make a `Response` on failure.
 - We validate everything due to strong types.
 
-==DOWN==
+==SLIDE==
 
 ## Strong types
 
@@ -817,61 +1031,28 @@ Price r = x + d; // compiles
 
 `std::chrono` does this too.
 
-<!-- .slide: data-background-image="image/viaduct-pipes.png" data-background-size="contain" -->
-
 ==SLIDE==
 
-## Dealing with multiple Es (take 1)
+# Dealing with multiple Error Types
 
-We're going to need a better `variant`.
-
-==DOWN==
-
-If `variant` is a compositional context, what are the operations?
-
-```
-visit  :: variant<T, U, ...>, (f(T|U|...) -> V) -> V;
-???
-```
+We're going to need a better `variant`. We'll call it `sum`.
 
 ==DOWN==
 
-We need `transform`, at least.
+If `sum` is a compositional context, what is the core lift?
 
 ```
-visit     :: variant<T, U, ...>, (f(T|U|...) -> V) -> V;
-transform :: 
-    variant<T, U, ...>, overload{f(T) -> T', f(U) -> U', ...}
-    -> variant<T', U', ...>;
+transform  :: {(Ti -> Ui)...} -> (sum<Ti...> -> sum<Ui...>);
 ```
-
-The usual name for `visit` is `match`.
-
-The name for `transform` is `map` or `fmap`.
-
-==DOWN==
-
-### Gettin' fancy
-
-Some kind of `bind` with partial variants: `pmap`
-
-```
-pmap :: v<T, U, ...>,
-        overload{f(T)->v<X, Y>, f(U)->v<Z, W>, ...}
-    -> v<X, Y, Z, W, ...>;
-```
-
-(I totally made this name up)
 
 ==DOWN==
 
 ### Example: a state machine:
 
 ```cpp
-using State = variant<Initialized, Connecting,
-                      Connected, Disconnected, Fail>;
-using Message = variant<Connect, Stop, Data,
-                        UnexpectedDisconnect>;
+using State = sum<Initialized, Connecting,
+                  Connected, Disconnected, Fail>;
+using Message = sum<Connect, Stop, Data, UnexpectedDisconnect>;
 template <typename X>
 concept a_live_state = std::same_as<X, Initialized> 
                     || std::same_as<X, Connecting>
@@ -880,27 +1061,24 @@ concept a_live_state = std::same_as<X, Initialized>
 
 ==DOWN==
 
-We will also introduce multiple dispatch using `pmap` over a `variant-pack`:
-
 ```cpp
 auto transition(State s, Message m) {
-    return (s & m) | pmap(overload{ // double dispatch!
+    return (s & m).transform(fn::overload{ // double dispatch!
         [](Initialized s, Connect c)
-            -> variant<Connecting, Fail> {...},
+            -> sum<Connecting, Fail> {...},
         [](Connected auto s, Data d)
-            -> variant<Connected, Fail> {...},
+            -> sum<Connected, Fail> {...},
         [](a_live_state auto s, Stop)
-            -> variant<Disconnected> {...},
+            -> Disconnected {...},
         [](a_live_state auto s, UnexpectedDisconnect)
-            -> variant<Connecting, Fail> {...},
+            -> sum<Connecting, Fail> {...},
         [](auto s, auto m)
-            -> variant<Fail> { return variant<Fail>{}; },
-    });
+            -> Fail { return sum<Fail>{}; },
+    }); // -> <Connecting, Fail, Connected, Disconnected>
 }
 ```
 
-`pmap` concatenates all the results.
-
+`transform` unions result types.
 
 <!--
 
@@ -919,21 +1097,128 @@ To make things a bit more efficient, we can introduce a
 
 -->
 
+==DOWN==
+
+What's the type of `(s & m)`?
+
+==DOWN==
+
+What's the type of `(s & m)`?
+
+it's `pack<State, Message>`
+
+==DOWN==
+
+## Making returning and calling symmetric
+
+`sum` is special:
+
+`transform` finds the common return type (it's a sum)
+
+```cpp
+sum<A, B, C>{b} | transform(overload{
+    [](B) {...} -> sum<E, F>
+    [](A) {...} -> sum<pack<C, D>, E>,
+    [](C) {...} -> G,
+}); // sum<E, F, G, pack<C, D>>
+```
+
+==DOWN==
+
+## `pack` unpacks into arguments
+
+```cpp
+pack{1, A{}, B{}} | transform([](int, A, B) {});
+```
+
+
+==DOWN==
+
+## pack of sums does multiple dispatch
+
+```cpp
+pack<sum<A, B>, sum<X, Y>>{A{}, B{}}
+| transform{overload{
+    [](A, X) {...},
+    [](A, Y) {...},
+    [](B, X) {...},
+    [](B, Y) {...}
+}}:
+```
+
+... and it also finds the common type.
+
+==DOWN==
+
+## The algebra
+
+For ONE `T`:
+
+```cpp
+sum<T> = pack<T> = sum<pack<T>> = pack<sum<T>>
+```
+
+==DOWN==
+
+For multiple:
+
+```
+pack<sum<A, B>, sum<X, Y>> 
+=
+sum<pack<A, X>,
+    pack<A, Y>,
+    pack<B, X>,
+    pack<B, Y>>
+```
+
+(works for more than one `sum` in a pack)
+
+==DOWN==
+
+## Flattening
+
+`sum<sum<T, U>>` -> `sum<T, U>`
+
+
+`pack<pack<T, U>, V>` -> `pack<T, U, V>`.
+
+These equivalences let us define calling overload sets.
+
+==DOWN==
+
+An overload set is a function defined "in parts".
+
+Overload set calls don't compose; you can call it once, but you can't call one
+with a return value (you only get one type).
+
+This makes pipelines not work.
+
+```cpp
+transition(current_state, message) -> pack<state, effect> {...};
+pack{current_state, message}
+   | transform([&](auto s, auto effect) {
+    environment.dispatch(effect);
+    return fn::pack{s, environment.read_next_message()};
+   })
+   | transform(transition) ...;
+```
 
 ==SLIDE==
-### Back to our `expected<T, variant<Es...>>`
 
-Let's try to use our error monad with this improved `variant` on the `Error`
+### Back to our expected
+
+`expected<T, sum<Es...>>`
+
+Let's try to use our error monad with this improved `sum` on the `Error`
 side:
 
 ```cpp
-open(path) // expected<File, variant<DoesNotExist,
-                                     PermError>>
+open(path) // expected<File, sum<DoesNotExist, PermError>>
     | and_then(
-        read_line // expected<std::string, IOError>
-        | transform_error(???) // oops
+        read_line // expected<std::string, IOError> - oops
     )
 ```
+<!-- .element: style="width: 100%" -->
 
 Can't.
 
@@ -942,10 +1227,8 @@ Can't.
 Need to try this again:
 
 ```cpp
-using AllErrors = variant<DoesNotExist, PermError,
-                          IOError>;
-open(path) // expected<File, variant<DoesNotExist,
-                                     PermError>>
+using AllErrors = sum<DoesNotExist, PermError, IOError>;
+open(path) // expected<File, sum<DoesNotExist, PermError>>
     | transform_error(match(make<AllErrors>))
     // blech
     | and_then(
@@ -956,47 +1239,41 @@ open(path) // expected<File, variant<DoesNotExist,
         parse_version // expected<Version, SyntaxError> oh, nononono.
     )
 ```
+<!-- .element: style="width: 100%" -->
 
 We need something less annoying that accumulates error types.
 
 ==SLIDE==
-## Monadic mixins -- validations
+
+## Enter graded monads
 
 <!--
 Returning back to our `expected` with multiple error types - we need to make
-`expected` work with that. We call that the `validation` context.
+`expected` work with that. We call that the `expected` context.
 
 -->
 
-Validation "mixes in" the `variant` on the `error` side.
-
-It also *computes* the types on the Error side.
+Graded monads are... relaxed.
 
 ```cpp
 auto version_or_error 
-    = open(path)          // validation<File, DoesNotExist,
-                          //            PermError>
+    = open(path)          // fn::expected<File, sum<DoesNotExist, PermError>>
     | and_then(read_line  // expected<std::string, IOError>
-    ) // validation<std::string, DoesNotExist,
-      //            PermError, IOError>
+    ) // expected<std::string, sum<DoesNotExist, PermError, IOError>>
     | and_then(parse_version);
-    // validation<Version, DoesNotExist, PermError,
-                           IOError, SyntaxError>
+    // expected<Version, sum<DoesNotExist, PermError, IOError, SyntaxError>>
 ```
+<!-- .element: style="width: 100%" -->
 
 ==DOWN==
 
-`validation` is a closed-polymorphic equivalent to c++ exceptions.
+`expected<T, sum<...>>` is a closed-polymorphic equivalent to c++ exceptions.
 
 We can also handle the errors generically.
 
 ```cpp
-template <typename X, typename... Ts>
-concept any_of
-    = (... || std::same_as<std::remove_cvref_t<X>, Ts>);
-
 version_or_error
-    | match_error( // match may return void
+    | on_error( // may return void
         overload{
         [](any_of<DoesNotExist, PermError, IOError> auto&& e) {
             std::print("could not read file {}", e.filename);
@@ -1006,20 +1283,38 @@ version_or_error
         }
     });
 ```
+<!-- .element: style="width: 100%" -->
 
 ==DOWN==
 
-## FIN
+### Back to the `get_maybe`...
 
-`transform_error` of course exists, but the `match` family doesn't require me
-to invent something to return.
+Using `sum`, we can drop the requirement to provide the type of `get_maybe`:
 
-## Recap:
+```cpp
+struct config {
+    auto get_maybe(std::string const& key) 
+      -> fn::optional<fn::sum_for<std::string, int, float>>;
+};
+auto connect(config c) -> fn::optional<socket_addr> {
+  return (c.get_maybe("hostname") & c.get_maybe("port"))
+       //            ^ <std::string> no longer here
+       // optional<pack<sum<...>, sum<...>>
+      .and_then(
+          fn::overload{
+            [](std::string && hostname, int port) {
+               return fn::optional(socket_addr{std::move(hostname), port});
+            },
+            // fail if types weren't correct
+            [](auto const&...) { return std::nullopt; }
+      });
+}
+```
+<!-- .element: style="width: 100%" -->
 
-We mixed in the `variant` context into the `expected` context. Are there
-other mixed-in contexts?
 
 ==SLIDE==
+
 ## Conclusion
 
 In order to name common control flow patterns, we reach for named compositional
@@ -1029,13 +1324,20 @@ We explored the following contexts today:
 
 - `optional` or "Maybe"
 - `expected` or "Error"
-- `variant` or "Choice"
-- `validation`
+- `sum`
+
+And we touched on what it takes to make function call composition work the same
+way going out as going in.
 
 ==DOWN==
 
-<!-- .slide: data-background-image="image/viaduct-balthazar.png" data-background-size="contain" -->
+Happy hacking!
 
+==SLIDE==
+
+<!-- .slide: data-background-image="image/meetup-01-social.png" data-background-position: "right" -->
+==DOWN==
+<!-- .slide: data-background-image="image/citsec-recruiting-slide.png" data-background-position: "right" -->
 
 <!--
 BONUS
@@ -1062,5 +1364,13 @@ correct async code a breeze.
 
 However, we only used it for the bits that concerned execution and async
 behavior. For the rest, we used the above contexts, and strong types.
+
+References: https://arxiv.org/pdf/2001.10274.pdf
+
+TODO:
+- think up questions for audience
+- restructure examples to show good practive
+- restructure to show strong types first
+- intruduce sum and pack and how they're different from tuple and choice
 
 -->
