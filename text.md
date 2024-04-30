@@ -406,7 +406,7 @@ auto get_hostname(int argc, char const* const* argv,
     }
     // ad-hoc Maybe
     if (char const* maybe_host = getenv("SERVICE_HOSTNAME");
-        (maybe_host != nullptr) || (*maybe_host != '\0')) {
+        (maybe_host != nullptr) && (*maybe_host != '\0')) {
         return maybe_host;
     }
     return default_hostname;
@@ -743,11 +743,11 @@ auto parse_int(std::span<char const> src)
     if (negative || src[0] == '+') { src = src.subspan(1); }
     if (src.empty()) { return unexpected(ParseError(src)); }
     int result = 0;
-    if ('0' <= src[0] && '9' <= src[0]) {
+    if ('0' <= src[0] && src[0] <= '9') {
         result = src[0] - '0';
         src = src.subspan(1);
     }
-    while (!src.empty() && '0' <= src[0] && '9' <= src[0]) {
+    while (!src.empty() && '0' <= src[0] && src[0] <= '9') {
         // not checking for overflow
         result = result * 10 + (src[0] - '0');
         src = src.subspan(1);
@@ -763,7 +763,7 @@ We could rework this to reduce the number of visible branches:
 
 ```cpp
 auto parse_digit(std::span<char const> src) -> parser_for<int> {
-  return (!src.empty() && '0' <= src[0] && '9' <= src[0]) 
+  return (!src.empty() && '0' <= src[0] && src[0] <=  '9') 
          ? parser_for<int>(std::pair{src[0] - '0', src.subspan(1)});
          : unexpected(ParseError(src));
 }
@@ -856,7 +856,7 @@ concept any_of =
 
 C++ has exceptions, and we want to catch any of them:
 
-```cpp [1|2|4]
+```cpp [2|3|5]
 try {
     g(2); // throws... what?
 } catch (any_of<E1, E2, E3> auto&& exc) {
@@ -940,7 +940,10 @@ join<T, sum<Ts...>> == sum<T, Ts...>
 sum_for<int, string>{2} 
     | transform(overload{
         [](int x) -> sum_for<NegativeInt, PositiveInt> {
-            return x < 0 ? sum<NegativeInt>{x} : sum<PositiveInt>{x};
+            if (x < 0) {
+                return NegativeInt{x};
+            }
+            return PositiveInt{x};
         },
         fn::identity
     }); // sum_for<string, NegativeInt, PositiveInt>
@@ -1071,7 +1074,7 @@ Packs autoflatten and concatenate unpacked arguments.
 
 ==DOWN==
 
-## it still distributes inside monads, same as `join`
+It still distributes inside monads, same as `join`.
 
 Multiple monadic arguments work as packs!
 
@@ -1295,7 +1298,7 @@ auto transition(State s, Message m) {
   return (s & m) // pack<State, Message>
     | transform(fn::overload{ // double dispatch!
     [](Initialized s, Connect c)     -> sum<Connecting, Fail> {...},
-    [](Connected auto s, Data d)     -> sum<Connected, Fail>  {...},
+    [](Connected s, Data d)          -> sum<Connected, Fail>  {...},
     [](some_live_state auto s, Stop) -> Disconnected          {...},
     [](some_live_state auto s, UnexpectedDisconnect)
                                      -> sum<Connecting, Fail> {...},
@@ -1374,7 +1377,22 @@ auto connect(config c) -> fn::optional<socket_addr> {
 
 ==SLIDE==
 
-Congratulations on this gentle introduction to the
+## Drilling
+
+What if you have a monad in a monad?
+
+```cpp
+expected<optional<int>, E>{optional{3}}
+    | transform(
+        transform(
+            [](int x){ return format("{}", x); }
+        )
+    ); // expected<optional<string>>
+```
+
+==SLIDE==
+
+<small>Congratulations on surviving this gentle introduction to the</small>
 
 # `sum` - `pack` kaboodle
 
